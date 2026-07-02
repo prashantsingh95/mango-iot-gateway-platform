@@ -1,0 +1,65 @@
+groups:
+  - name: iot-platform-alerts
+    rules:
+      - alert: GatewayOffline
+        expr: gateway_status{status="OFFLINE"} > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Gateway {{ $labels.name }} is offline"
+          description: "Gateway {{ $labels.name }} has been offline for more than 5 minutes"
+
+      - alert: HighCpuUsage
+        expr: gateway_cpu_usage > 90
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High CPU usage on gateway {{ $labels.name }}"
+          description: "CPU usage is at {{ $value }}% on gateway {{ $labels.name }}"
+
+      - alert: HighMemoryUsage
+        expr: gateway_memory_usage > 90
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High memory usage on gateway {{ $labels.name }}"
+          description: "Memory usage is at {{ $value }}% on gateway {{ $labels.name }}"
+
+      - alert: LowSignalStrength
+        expr: gateway_signal_strength < -80
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low signal strength on gateway {{ $labels.name }}"
+          description: "Signal strength is {{ $value }}dBm on gateway {{ $labels.name }}"
+
+      - alert: LowBattery
+        expr: gateway_battery_level < 20
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Low battery on gateway {{ $labels.name }}"
+          description: "Battery level is at {{ $value }}% on gateway {{ $labels.name }}"
+
+      - alert: FirmwareUpdateFailed
+        expr: firmware_update_status{status="FAILED"} > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Firmware update failed on gateway {{ $labels.name }}"
+          description: "Firmware update failed on gateway {{ $labels.name }}"
+
+      - alert: HighDiskUsage
+        expr: gateway_disk_usage > 85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High disk usage on gateway {{ $labels.name }}"
+          description: "Disk usage is at {{ $value }}% on gateway {{ $labels.name }}"

@@ -1,0 +1,111 @@
+global:
+  environment: production
+  imageRegistry: ghcr.io/your-org
+
+postgresql:
+  enabled: true
+  auth:
+    database: iot_platform
+    username: iotadmin
+    password: iotpassword
+  primary:
+    persistence:
+      size: 10Gi
+
+redis:
+  enabled: true
+  auth:
+    enabled: false
+  architecture: standalone
+  master:
+    persistence:
+      size: 5Gi
+
+emqx:
+  enabled: true
+  replicaCount: 3
+  config:
+    cluster:
+      discovery_strategy: dns
+  service:
+    type: ClusterIP
+
+nats:
+  enabled: true
+  cluster:
+    enabled: true
+    replicas: 3
+  jetstream:
+    enabled: true
+    fileStore:
+      pvc:
+        size: 10Gi
+
+backend:
+  replicaCount: 3
+  image:
+    repository: iot-platform-backend
+    tag: latest
+    pullPolicy: Always
+  service:
+    port: 3001
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+frontend:
+  replicaCount: 2
+  image:
+    repository: iot-platform-frontend
+    tag: latest
+    pullPolicy: Always
+  service:
+    port: 3000
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-body-size: 50m
+  hosts:
+    - host: iot-platform.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service: frontend
+  tls:
+    - hosts:
+        - iot-platform.example.com
+      secretName: iot-platform-tls
+
+monitoring:
+  prometheus:
+    enabled: true
+    retentionDays: 30
+  grafana:
+    enabled: true
+    adminPassword: admin

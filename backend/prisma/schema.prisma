@@ -1,0 +1,450 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum GatewayStatus {
+  ONLINE
+  OFFLINE
+  PROVISIONING
+  ACTIVE
+  INACTIVE
+  ERROR
+  UPDATING
+  UNKNOWN
+}
+
+enum TenantStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  OPERATOR
+  VIEWER
+}
+
+enum FirmwareStatus {
+  DRAFT
+  VALIDATED
+  PUBLISHED
+  DEPLOYED
+  PENDING
+  ROLLED_BACK
+  ARCHIVED
+}
+
+enum AlertSeverity {
+  CRITICAL
+  WARNING
+  INFO
+  DEBUG
+}
+
+enum AlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+  DISMISSED
+}
+
+enum ProtocolType {
+  MQTT
+  MODBUS
+  BACNET
+  OPC_UA
+  LORAWAN
+  ZIGBEE
+  BLE
+  CAN_BUS
+  SERIAL
+  CUSTOM
+  HTTP
+  COAP
+}
+
+// Multi-tenant Organization
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  slug      String   @unique
+  domain    String?
+  status    TenantStatus @default(ACTIVE)
+  settings  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users     User[]
+  gateways  Gateway[]
+  sites     Site[]
+  configProfiles ConfigProfile[]
+  gatewayGroups  GatewayGroup[]
+  alerts    Alert[]
+  firmwareReleases FirmwareRelease[]
+  provisioningTokens ProvisioningToken[]
+  auditLogs AuditLog[]
+}
+
+// Users & Authentication
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  passwordHash   String
+  name           String
+  role           UserRole @default(OPERATOR)
+  avatar         String?
+  phone          String?
+  isMfaEnabled   Boolean  @default(false)
+  mfaSecret      String?
+  lastLoginAt    DateTime?
+  isActive       Boolean  @default(true)
+  refreshToken   String?
+  tenantId       String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant         Tenant   @relation(fields: [tenantId], references: [id])
+  sessions       Session[]
+  auditLogs      AuditLog[]
+  alerts         Alert[]  @relation("AssignedAlerts")
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+}
+
+// User Sessions
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  ipAddress String?
+  userAgent String?
+  expiresAt DateTime
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([token])
+}
+
+// Sites / Locations
+model Site {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  address     String?
+  latitude    Float?
+  longitude   Float?
+  timezone    String?
+  metadata    Json?
+  tenantId    String
+  parentId    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  parent      Site?    @relation("SiteHierarchy", fields: [parentId], references: [id])
+  children    Site[]   @relation("SiteHierarchy")
+  gateways    Gateway[]
+
+  @@index([tenantId])
+  @@index([parentId])
+}
+
+// Gateway Devices
+model Gateway {
+  id                String        @id @default(cuid())
+  deviceId          String        @unique
+  name              String
+  serialNumber      String        @unique
+  macAddress        String?
+  model             String?
+  manufacturer      String?
+  firmwareVersion   String?
+  hardwareVersion   String?
+  osVersion         String?
+  status            GatewayStatus @default(PROVISIONING)
+  statusReason      String?
+  ipAddress         String?
+  publicIp          String?
+  lastHeartbeat     DateTime?
+  lastBootAt        DateTime?
+  uptime            Int?
+  cpuUsage          Float?
+  memoryUsage       Float?
+  diskUsage         Float?
+  temperature       Float?
+  signalStrength    Float?
+  voltage           Float?
+  batteryLevel      Float?
+  locationLat       Float?
+  locationLng       Float?
+  tags              String[]
+  metadata          Json?
+  isProvisioned     Boolean       @default(false)
+  provisionedAt     DateTime?
+  certificateId     String?
+  configProfileId   String?
+  tenantId          String
+  siteId            String?
+  groupId           String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  tenant            Tenant        @relation(fields: [tenantId], references: [id])
+  site              Site?         @relation(fields: [siteId], references: [id])
+  group             GatewayGroup? @relation(fields: [groupId], references: [id])
+  configProfile     ConfigProfile? @relation(fields: [configProfileId], references: [id])
+  connectedDevices  ConnectedDevice[]
+  firmwareHistory   FirmwareHistory[]
+  commands          GatewayCommand[]
+  logs              GatewayLog[]
+
+  @@index([tenantId])
+  @@index([siteId])
+  @@index([status])
+  @@index([groupId])
+  @@index([deviceId])
+  @@index([serialNumber])
+}
+
+// Gateway Groups
+model GatewayGroup {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  metadata    Json?
+  tenantId    String
+  parentId    String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+  parent      GatewayGroup? @relation("GroupHierarchy", fields: [parentId], references: [id])
+  children    GatewayGroup[] @relation("GroupHierarchy")
+  gateways    Gateway[]
+
+  @@index([tenantId])
+}
+
+// Configuration Profiles
+model ConfigProfile {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  version     Int      @default(1)
+  config      Json
+  isActive    Boolean  @default(true)
+  tenantId    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  gateways    Gateway[]
+  versions    ConfigVersion[]
+
+  @@index([tenantId])
+}
+
+// Configuration Version History
+model ConfigVersion {
+  id          String   @id @default(cuid())
+  profileId   String
+  version     Int
+  config      Json
+  changelog   String?
+  createdBy   String
+  createdAt   DateTime @default(now())
+
+  profile     ConfigProfile @relation(fields: [profileId], references: [id])
+
+  @@index([profileId])
+  @@unique([profileId, version])
+}
+
+// Firmware Releases
+model FirmwareRelease {
+  id              String         @id @default(cuid())
+  name            String
+  version         String
+  description     String?
+  filename        String
+  fileSize        Int
+  checksum        String
+  signature       String?
+  status          FirmwareStatus @default(DRAFT)
+  targetModel     String?
+  targetHardware  String?
+  changelog       String?
+  isCritical      Boolean        @default(false)
+  minFirmwareVersion String?
+  s3Path          String
+  tenantId        String
+  createdBy       String
+  publishedAt     DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  tenant          Tenant         @relation(fields: [tenantId], references: [id])
+  history         FirmwareHistory[]
+
+  @@index([tenantId])
+  @@index([version])
+}
+
+// Firmware Deployment History
+model FirmwareHistory {
+  id           String          @id @default(cuid())
+  gatewayId    String
+  firmwareId   String
+  status       FirmwareStatus
+  progress     Int             @default(0)
+  errorMessage String?
+  deployedAt   DateTime        @default(now())
+  completedAt  DateTime?
+
+  gateway      Gateway         @relation(fields: [gatewayId], references: [id])
+  firmware     FirmwareRelease @relation(fields: [firmwareId], references: [id])
+
+  @@index([gatewayId])
+  @@index([firmwareId])
+}
+
+// Connected / Edge Devices
+model ConnectedDevice {
+  id            String       @id @default(cuid())
+  deviceId      String       @unique
+  name          String
+  type          String
+  protocol      ProtocolType
+  manufacturer  String?
+  model         String?
+  serialNumber  String?
+  firmwareVersion String?
+  status        String       @default("ONLINE")
+  lastSeenAt    DateTime?
+  metadata      Json?
+  gatewayId     String
+  tenantId      String
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  gateway       Gateway      @relation(fields: [gatewayId], references: [id])
+
+  @@index([gatewayId])
+  @@index([deviceId])
+}
+
+// Gateway Commands
+model GatewayCommand {
+  id          String   @id @default(cuid())
+  gatewayId   String
+  type        String
+  payload     Json?
+  status      String   @default("PENDING")
+  result      Json?
+  error       String?
+  executedBy  String
+  executedAt  DateTime?
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+
+  gateway     Gateway  @relation(fields: [gatewayId], references: [id])
+
+  @@index([gatewayId])
+  @@index([status])
+}
+
+// Gateway Logs
+model GatewayLog {
+  id        String   @id @default(cuid())
+  gatewayId String
+  level     String   @default("INFO")
+  source    String?
+  message   String
+  metadata  Json?
+  timestamp DateTime @default(now())
+
+  gateway   Gateway  @relation(fields: [gatewayId], references: [id])
+
+  @@index([gatewayId])
+  @@index([timestamp])
+}
+
+// Alerts
+model Alert {
+  id          String        @id @default(cuid())
+  title       String
+  description String?
+  severity    AlertSeverity @default(WARNING)
+  status      AlertStatus   @default(OPEN)
+  source      String?
+  sourceId    String?
+  metadata    Json?
+  acknowledgedBy String?
+  acknowledgedAt DateTime?
+  resolvedBy    String?
+  resolvedAt    DateTime?
+  tenantId    String
+  assignedTo  String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  tenant      Tenant        @relation(fields: [tenantId], references: [id])
+  assignee    User?         @relation("AssignedAlerts", fields: [assignedTo], references: [id])
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([severity])
+}
+
+// Audit Logs
+model AuditLog {
+  id         String   @id @default(cuid())
+  action     String
+  entity     String
+  entityId   String?
+  userId     String?
+  tenantId   String
+  ipAddress  String?
+  userAgent  String?
+  metadata   Json?
+  timestamp  DateTime @default(now())
+
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  user       User?    @relation(fields: [userId], references: [id])
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([entity])
+  @@index([entityId])
+  @@index([timestamp])
+}
+
+// Provisioning Tokens
+model ProvisioningToken {
+  id           String   @id @default(cuid())
+  token        String   @unique
+  description  String?
+  maxUses      Int?
+  useCount     Int      @default(0)
+  expiresAt    DateTime?
+  isActive     Boolean  @default(true)
+  tenantId     String
+  createdBy    String
+  createdAt    DateTime @default(now())
+
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@index([token])
+  @@index([tenantId])
+}

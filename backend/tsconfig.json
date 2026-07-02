@@ -1,0 +1,39 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2021",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "incremental": true,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "noImplicitAny": true,
+    "strictBindCallApply": true,
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true,
+    "paths": {
+      "@/*": ["src/*"],
+      "@common/*": ["src/common/*"],
+      "@config/*": ["src/config/*"],
+      "@auth/*": ["src/auth/*"],
+      "@gateways/*": ["src/gateways/*"],
+      "@firmware/*": ["src/firmware/*"],
+      "@mqtt/*": ["src/mqtt/*"],
+      "@monitoring/*": ["src/monitoring/*"],
+      "@alerts/*": ["src/alerts/*"],
+      "@websocket/*": ["src/websocket/*"],
+      "@logging/*": ["src/logging/*"],
+      "@provisioning/*": ["src/provisioning/*"],
+      "@analytics/*": ["src/analytics/*"],
+      "@cache/*": ["src/cache/*"]
+    }
+  },
+  "include": ["src/**/*", "prisma/**/*", "test/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

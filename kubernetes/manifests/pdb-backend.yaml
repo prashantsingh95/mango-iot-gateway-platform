@@ -1,0 +1,10 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: iot-backend-pdb
+  namespace: iot-platform
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: iot-backend
