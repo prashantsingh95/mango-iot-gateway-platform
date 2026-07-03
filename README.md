@@ -160,6 +160,46 @@ Opens at http://localhost:3000
 
 ---
 
+## End-to-End: Deploy Platform + Connect Pi Gateway (Single Command Each)
+
+### 1. Deploy Platform (on your server/VM)
+```bash
+git clone https://github.com/mango-iot/gateway-platform.git
+cd mango-iot-gateway-platform
+sudo bash setup-server.sh
+```
+
+### 2. Get Credentials & Create Provisioning Token
+After platform setup, login at `http://YOUR_SERVER_IP:3000` (admin@iot.com / admin123) and:
+1. Go to **Provisioning** page
+2. Click **Create Token** → copy the token
+3. Note your MQTT credentials from `/root/.iot-server-credentials`
+
+### 3. Connect Pi Gateway (on the Raspberry Pi)
+```bash
+# Copy client to Pi (from your machine)
+scp -r gateway-client pi@YOUR_PI_IP:~/
+ssh pi@YOUR_PI_IP
+cd gateway-client
+
+# One-command install with all params
+sudo bash setup.sh \
+  --server mqtt://YOUR_SERVER_IP:1883 \
+  --mqtt-user iot \
+  --mqtt-pass YOUR_MQTT_PASSWORD \
+  --token YOUR_PROVISION_TOKEN \
+  --device-id factory-gw-01 \
+  --name "Factory Gateway #1"
+```
+
+### 4. Enable Terminal Access (SSH)
+In platform UI: **Settings** → add:
+- `sshUsername`: your Pi username (e.g., `pi` or `prashant`)
+- `sshPassword`: your Pi SSH password
+- `sshPort`: 22
+
+Now you can open **Terminal** tab in gateway detail view!
+
 ## Client Project
 
 The gateway agent that runs on each Raspberry Pi is a **separate project**:
