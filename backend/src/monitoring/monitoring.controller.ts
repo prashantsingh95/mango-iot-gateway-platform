@@ -23,14 +23,3 @@ export class MonitoringController {
     return this.monitoringService.getGatewayMetrics(id, tenantId);
   }
 }
-
-@Controller()
-export class HealthController {
-  constructor(private readonly monitoringService: MonitoringService) {}
-
-  @Get('health')
-  @ApiOperation({ summary: 'Health check endpoint' })
-  async healthCheck() {
-    return this.monitoringService.healthCheck();
-  }
-}

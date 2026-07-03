@@ -191,9 +191,9 @@ export class GatewaysController {
   @ApiOperation({ summary: 'Get gateway command history' })
   async getCommands(
     @Param('id') id: string,
+    @CurrentUser('tenantId') tenantId: string,
     @Query() query: PaginationDto,
     @Query('status') status?: string,
-    @CurrentUser('tenantId') tenantId: string,
   ) {
     return this.gatewaysService.getCommands(id, tenantId, { ...query, status });
   }

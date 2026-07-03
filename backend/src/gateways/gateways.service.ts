@@ -75,11 +75,11 @@ export class GatewaysService {
     const gateway = await this.prisma.gateway.findFirst({
       where: { id, tenantId },
       include: {
-        owner: { select: { id: true, name: true, email: true } },
         site: { select: { id: true, name: true } },
         group: { select: { id: true, name: true } },
         configProfile: { include: { versions: { orderBy: { version: 'desc' }, take: 5 } } },
         connectedDevices: true,
+        owner: { select: { id: true, name: true, email: true } },
       },
     });
 

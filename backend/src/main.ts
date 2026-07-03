@@ -92,12 +92,6 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api/docs', app, document);
 
-  const jwtSecret = configService.get<string>('jwt.secret');
-  if (!jwtSecret || jwtSecret.length < 32) {
-    logger.error('JWT_SECRET must be set to at least 32 characters in .env');
-    process.exit(1);
-  }
-
   const port = configService.get<number>('PORT', 3001);
   const host = configService.get<string>('HOST', '0.0.0.0');
 

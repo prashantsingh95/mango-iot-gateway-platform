@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
-import { MonitoringController, HealthController } from './monitoring.controller';
+import { MonitoringController } from './monitoring.controller';
 import { MonitoringService } from './monitoring.service';
 
 @Module({
-  controllers: [MonitoringController, HealthController],
+  controllers: [MonitoringController],
   providers: [MonitoringService],
   exports: [MonitoringService],
 })

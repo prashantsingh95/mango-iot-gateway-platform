@@ -213,6 +213,7 @@ model Gateway {
   commands          GatewayCommand[]
   logs              GatewayLog[]
   access            GatewayAccess[]
+  uptimeSlots       GatewayUptimeSlot[]
 
   @@index([tenantId])
   @@index([siteId])

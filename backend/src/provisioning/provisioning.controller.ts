@@ -32,10 +32,10 @@ export class ProvisioningController {
   @ApiOperation({ summary: 'List provisioning tokens' })
   async listTokens(
     @CurrentUser('tenantId') tenantId: string,
-    @Query('page') page?: number,
-    @Query('limit') limit?: number,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
-    return this.provisioningService.listTokens(tenantId, page, limit);
+    return this.provisioningService.listTokens(tenantId, page ? parseInt(page, 10) : 1, limit ? parseInt(limit, 10) : 50);
   }
 
   @Delete('tokens/:id')
