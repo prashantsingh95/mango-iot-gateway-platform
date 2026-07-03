@@ -7,6 +7,7 @@ import {
 } from '@nestjs/websockets';
 import { Logger, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { PrismaService } from '../common/prisma.service';
 import { Server, Socket } from 'socket.io';
 
 @WebSocketGateway({
@@ -23,7 +24,10 @@ export class WebSocketGatewayImpl implements OnGatewayConnection, OnGatewayDisco
   private readonly logger = new Logger(WebSocketGatewayImpl.name);
   private connectedClients = new Map<string, { socket: Socket; tenantId: string; userId: string }>();
 
-  constructor(private readonly jwtService: JwtService) {}
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   handleConnection(client: Socket) {
     const token = client.handshake.auth?.token;
@@ -51,7 +55,14 @@ export class WebSocketGatewayImpl implements OnGatewayConnection, OnGatewayDisco
   }
 
   @SubscribeMessage('subscribe:gateway')
-  handleSubscribeGateway(client: Socket, gatewayId: string) {
+  async handleSubscribeGateway(client: Socket, gatewayId: string) {
+    const gateway = await this.prisma.gateway.findFirst({
+      where: { id: gatewayId, tenantId: client.data.tenantId },
+      select: { id: true },
+    });
+    if (!gateway) {
+      return { event: 'error', data: { message: 'Gateway not found' } };
+    }
     client.join(`gateway:${client.data.tenantId}:${gatewayId}`);
     return { event: 'subscribed', data: { gatewayId } };
   }

@@ -17,6 +17,7 @@ import { LogViewer } from './log-viewer';
 import { CommandsTab } from './commands-tab';
 import { FirmwareTab } from './firmware-tab';
 import { TerminalTab } from './terminal-tab';
+import { UptimeTab } from '@/components/gateways/uptime-tab';
 
 const statusVariantMap: Record<string, 'success' | 'destructive' | 'warning' | 'info' | 'secondary'> = {
   ONLINE: 'success',
@@ -128,6 +129,7 @@ export default function GatewayDetailPage() {
       <Tabs defaultValue="details">
         <TabsList>
           <TabsTrigger value="details">Details</TabsTrigger>
+          <TabsTrigger value="uptime">Uptime</TabsTrigger>
           <TabsTrigger value="terminal">Terminal</TabsTrigger>
           <TabsTrigger value="commands">Commands</TabsTrigger>
           <TabsTrigger value="devices">Connected Devices</TabsTrigger>
@@ -154,6 +156,9 @@ export default function GatewayDetailPage() {
                   ['Last Heartbeat', gateway.lastHeartbeat ? formatRelativeTime(gateway.lastHeartbeat) : 'Never'],
                   ['Temperature', gateway.temperature != null ? `${gateway.temperature}°C` : 'N/A'],
                   ['Battery', gateway.batteryLevel != null ? `${gateway.batteryLevel}%` : 'N/A'],
+                  ['Owner', gateway.owner?.name || '-'],
+                  ['Group', gateway.group?.name || '-'],
+                  ['Site', gateway.site?.name || '-'],
                 ].map(([label, value]) => (
                   <div key={label as string}>
                     <dt className="text-sm text-muted-foreground">{label as string}</dt>
@@ -163,6 +168,9 @@ export default function GatewayDetailPage() {
               </dl>
             </CardContent>
           </Card>
+        </TabsContent>
+        <TabsContent value="uptime" className="space-y-4">
+          <UptimeTab gatewayId={id} />
         </TabsContent>
         <TabsContent value="terminal" className="space-y-4">
           <TerminalTab gatewayId={id} />

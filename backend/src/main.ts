@@ -57,6 +57,9 @@ async function bootstrap() {
     max: 100,
     timeWindow: 60000,
     keyGenerator: (req: any) => {
+      if (req.url?.includes('/auth/')) {
+        return req.ip;
+      }
       const tenant = req.headers['x-tenant-id'];
       return tenant ? `tenant:${tenant}` : req.ip;
     },
@@ -84,7 +87,6 @@ async function bootstrap() {
     .setDescription('Mango IoT Gateway Management Platform')
     .setVersion('1.0')
     .addBearerAuth()
-    .addApiKey({ type: 'apiKey', name: 'X-API-Key', in: 'header' }, 'api-key')
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);

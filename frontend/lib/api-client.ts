@@ -28,6 +28,19 @@ export const gatewaysApi = {
     api.get(`/gateways/${id}/commands`, { params }),
   getFirmwareHistory: (id: string, params?: Record<string, any>) =>
     api.get(`/gateways/${id}/firmware`, { params }),
+  getUptime: (id: string, params?: Record<string, any>) =>
+    api.get(`/gateways/${id}/uptime`, { params }),
+  getGroups: () => api.get('/gateways/groups'),
+  createGroup: (data: any) => api.post('/gateways/groups', data),
+  updateGroup: (id: string, data: any) => api.patch(`/gateways/groups/${id}`, data),
+  deleteGroup: (id: string) => api.delete(`/gateways/groups/${id}`),
+  assignGatewayGroup: (id: string, groupId: string | null) =>
+    api.patch(`/gateways/${id}/group`, { groupId }),
+  assignGatewayOwner: (id: string, ownerId: string | null) =>
+    api.patch(`/gateways/${id}/owner`, { ownerId }),
+  getGatewayAccess: (id: string) => api.get(`/gateways/${id}/access`),
+  setGatewayAccess: (id: string, userId: string, level: string) =>
+    api.post(`/gateways/${id}/access`, { userId, level }),
 };
 
 export const firmwareApi = {

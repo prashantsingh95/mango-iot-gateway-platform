@@ -21,7 +21,8 @@ export class CacheService {
     try {
       const val = await this.redis.get(key);
       return val ? JSON.parse(val) : null;
-    } catch {
+    } catch (err) {
+      this.logger.error(`Cache GET ${key} failed: ${err.message}`);
       return null;
     }
   }

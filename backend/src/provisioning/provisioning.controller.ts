@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { ProvisioningService } from './provisioning.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -6,6 +6,7 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Public } from '../common/decorators/public.decorator';
+import { CreateProvisioningTokenDto, ProvisionGatewayDto } from './dto/provisioning.dto';
 
 @ApiTags('Provisioning')
 @Controller('provisioning')
@@ -18,7 +19,7 @@ export class ProvisioningController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create provisioning token' })
   async createToken(
-    @Body() body: { description?: string; maxUses?: number; expiresInDays?: number },
+    @Body() body: CreateProvisioningTokenDto,
     @CurrentUser('id') userId: string,
     @CurrentUser('tenantId') tenantId: string,
   ) {
@@ -29,8 +30,12 @@ export class ProvisioningController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'List provisioning tokens' })
-  async listTokens(@CurrentUser('tenantId') tenantId: string) {
-    return this.provisioningService.listTokens(tenantId);
+  async listTokens(
+    @CurrentUser('tenantId') tenantId: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.provisioningService.listTokens(tenantId, page, limit);
   }
 
   @Delete('tokens/:id')
@@ -46,7 +51,7 @@ export class ProvisioningController {
   @Public()
   @ApiOperation({ summary: 'Provision gateway using token' })
   async provisionGateway(
-    @Body() body: { token: string; gateway: any },
+    @Body() body: ProvisionGatewayDto,
   ) {
     return this.provisioningService.provisionGateway(body.token, body.gateway);
   }

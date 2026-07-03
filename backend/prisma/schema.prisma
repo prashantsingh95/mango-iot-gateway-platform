@@ -110,10 +110,12 @@ model User {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  tenant         Tenant   @relation(fields: [tenantId], references: [id])
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   sessions       Session[]
   auditLogs      AuditLog[]
-  alerts         Alert[]  @relation("AssignedAlerts")
+  alerts         Alert[]          @relation("AssignedAlerts")
+  ownedGateways  Gateway[]        @relation("OwnedGateways")
+  gatewayAccess  GatewayAccess[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -130,7 +132,7 @@ model Session {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
 
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([token])
@@ -197,17 +199,20 @@ model Gateway {
   tenantId          String
   siteId            String?
   groupId           String?
+  ownerId           String?
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
   tenant            Tenant        @relation(fields: [tenantId], references: [id])
   site              Site?         @relation(fields: [siteId], references: [id])
   group             GatewayGroup? @relation(fields: [groupId], references: [id])
+  owner             User?         @relation("OwnedGateways", fields: [ownerId], references: [id])
   configProfile     ConfigProfile? @relation(fields: [configProfileId], references: [id])
   connectedDevices  ConnectedDevice[]
   firmwareHistory   FirmwareHistory[]
   commands          GatewayCommand[]
   logs              GatewayLog[]
+  access            GatewayAccess[]
 
   @@index([tenantId])
   @@index([siteId])
@@ -312,8 +317,8 @@ model FirmwareHistory {
   deployedAt   DateTime        @default(now())
   completedAt  DateTime?
 
-  gateway      Gateway         @relation(fields: [gatewayId], references: [id])
-  firmware     FirmwareRelease @relation(fields: [firmwareId], references: [id])
+  gateway      Gateway         @relation(fields: [gatewayId], references: [id], onDelete: Cascade)
+  firmware     FirmwareRelease @relation(fields: [firmwareId], references: [id], onDelete: Cascade)
 
   @@index([gatewayId])
   @@index([firmwareId])
@@ -338,10 +343,33 @@ model ConnectedDevice {
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 
-  gateway       Gateway      @relation(fields: [gatewayId], references: [id])
+  gateway       Gateway      @relation(fields: [gatewayId], references: [id], onDelete: Cascade)
 
   @@index([gatewayId])
   @@index([deviceId])
+}
+
+// Gateway Access Control (shared device permissions)
+enum GatewayAccessLevel {
+  VIEW
+  CONTROL
+  ADMIN
+}
+
+model GatewayAccess {
+  id        String              @id @default(cuid())
+  gatewayId String
+  userId    String
+  level     GatewayAccessLevel  @default(VIEW)
+  tenantId  String
+  createdAt DateTime            @default(now())
+
+  gateway   Gateway             @relation(fields: [gatewayId], references: [id], onDelete: Cascade)
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([gatewayId, userId])
+  @@index([userId])
+  @@index([gatewayId])
 }
 
 // Gateway Commands
@@ -358,7 +386,7 @@ model GatewayCommand {
   completedAt DateTime?
   createdAt   DateTime @default(now())
 
-  gateway     Gateway  @relation(fields: [gatewayId], references: [id])
+  gateway     Gateway  @relation(fields: [gatewayId], references: [id], onDelete: Cascade)
 
   @@index([gatewayId])
   @@index([status])
@@ -374,7 +402,7 @@ model GatewayLog {
   metadata  Json?
   timestamp DateTime @default(now())
 
-  gateway   Gateway  @relation(fields: [gatewayId], references: [id])
+  gateway   Gateway  @relation(fields: [gatewayId], references: [id], onDelete: Cascade)
 
   @@index([gatewayId])
   @@index([timestamp])
@@ -420,7 +448,7 @@ model AuditLog {
   metadata   Json?
   timestamp  DateTime @default(now())
 
-  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   user       User?    @relation(fields: [userId], references: [id])
 
   @@index([tenantId])
@@ -428,6 +456,25 @@ model AuditLog {
   @@index([entity])
   @@index([entityId])
   @@index([timestamp])
+}
+
+// Gateway Uptime History (15-min slots for uptime graph)
+model GatewayUptimeSlot {
+  id        String   @id @default(cuid())
+  gatewayId String
+  slotStart DateTime
+  slotEnd   DateTime
+  isUp      Boolean  @default(false)
+  tenantId  String
+  createdAt DateTime @default(now())
+
+  gateway   Gateway  @relation(fields: [gatewayId], references: [id], onDelete: Cascade)
+
+  @@unique([gatewayId, slotStart])
+  @@index([gatewayId])
+  @@index([tenantId])
+  @@index([slotStart])
+  @@index([gatewayId, slotStart])
 }
 
 // Provisioning Tokens

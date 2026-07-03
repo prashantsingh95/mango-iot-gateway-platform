@@ -11,11 +11,9 @@ export class EncryptionService {
   constructor(private readonly configService: ConfigService) {
     const raw = this.configService.get<string>('encryption.key');
     if (!raw || raw.length < 32) {
-      this.logger.warn('ENCRYPTION_KEY not set or too short — using derived key');
-      this.key = scryptSync('mango-default-key', 'salt', 32);
-    } else {
-      this.key = Buffer.from(raw.padEnd(64, '0').slice(0, 64), 'hex');
+      throw new Error('ENCRYPTION_KEY must be set to at least 32 hex characters in .env');
     }
+    this.key = Buffer.from(raw.padEnd(64, '0').slice(0, 64), 'hex');
   }
 
   encrypt(plaintext: string): string {

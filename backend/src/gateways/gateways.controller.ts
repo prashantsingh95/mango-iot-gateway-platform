@@ -6,6 +6,17 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { PaginationDto } from '../common/dto/pagination.dto';
+import {
+  CreateGatewayDto,
+  UpdateGatewayDto,
+  ExecuteCommandDto,
+  BulkImportGatewayDto,
+  CreateGroupDto,
+  UpdateGroupDto,
+  AssignGroupDto,
+  AssignOwnerDto,
+  SetAccessDto,
+} from './dto/gateway.dto';
 
 @ApiTags('Gateways')
 @ApiBearerAuth()
@@ -52,6 +63,55 @@ export class GatewaysController {
     return this.gatewaysService.getGroups(tenantId);
   }
 
+  @Post('groups')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @ApiOperation({ summary: 'Create a gateway group' })
+  async createGroup(@Body() body: CreateGroupDto, @CurrentUser('id') userId: string, @CurrentUser('tenantId') tenantId: string) {
+    return this.gatewaysService.createGroup(body, tenantId, userId);
+  }
+
+  @Patch('groups/:id')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @ApiOperation({ summary: 'Update a gateway group' })
+  async updateGroup(@Param('id') id: string, @Body() body: UpdateGroupDto, @CurrentUser('tenantId') tenantId: string) {
+    return this.gatewaysService.updateGroup(id, body, tenantId);
+  }
+
+  @Delete('groups/:id')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @ApiOperation({ summary: 'Delete a gateway group' })
+  async deleteGroup(@Param('id') id: string, @CurrentUser('tenantId') tenantId: string) {
+    return this.gatewaysService.deleteGroup(id, tenantId);
+  }
+
+  @Patch(':id/group')
+  @Roles('ADMIN', 'SUPER_ADMIN', 'OPERATOR')
+  @ApiOperation({ summary: 'Assign gateway to a group' })
+  async assignGroup(@Param('id') id: string, @Body() body: AssignGroupDto, @CurrentUser('tenantId') tenantId: string) {
+    return this.gatewaysService.assignGatewayToGroup(id, body.groupId, tenantId);
+  }
+
+  @Patch(':id/owner')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @ApiOperation({ summary: 'Assign owner to gateway' })
+  async assignOwner(@Param('id') id: string, @Body() body: AssignOwnerDto, @CurrentUser('tenantId') tenantId: string) {
+    return this.gatewaysService.assignOwner(id, body.ownerId, tenantId);
+  }
+
+  @Get(':id/access')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @ApiOperation({ summary: 'List gateway access permissions' })
+  async getAccess(@Param('id') id: string, @CurrentUser('tenantId') tenantId: string) {
+    return this.gatewaysService.getGatewayAccess(id, tenantId);
+  }
+
+  @Post(':id/access')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @ApiOperation({ summary: 'Set user access level for gateway (NONE to remove)' })
+  async setAccess(@Param('id') id: string, @Body() body: SetAccessDto, @CurrentUser('tenantId') tenantId: string) {
+    return this.gatewaysService.setGatewayAccess(id, body.userId, body.level, tenantId);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get gateway details' })
   async findOne(@Param('id') id: string, @CurrentUser('tenantId') tenantId: string) {
@@ -62,7 +122,7 @@ export class GatewaysController {
   @Roles('ADMIN', 'SUPER_ADMIN', 'OPERATOR')
   @ApiOperation({ summary: 'Create a new gateway' })
   async create(
-    @Body() body: any,
+    @Body() body: CreateGatewayDto,
     @CurrentUser('id') userId: string,
     @CurrentUser('tenantId') tenantId: string,
   ) {
@@ -72,7 +132,7 @@ export class GatewaysController {
   @Post('bulk')
   @Roles('ADMIN', 'SUPER_ADMIN')
   @ApiOperation({ summary: 'Bulk import gateways' })
-  async bulkImport(@Body() body: any[], @CurrentUser('tenantId') tenantId: string) {
+  async bulkImport(@Body() body: BulkImportGatewayDto[], @CurrentUser('tenantId') tenantId: string) {
     return this.gatewaysService.bulkImport(body, tenantId);
   }
 
@@ -81,7 +141,7 @@ export class GatewaysController {
   @ApiOperation({ summary: 'Update gateway' })
   async update(
     @Param('id') id: string,
-    @Body() body: any,
+    @Body() body: UpdateGatewayDto,
     @CurrentUser('id') userId: string,
     @CurrentUser('tenantId') tenantId: string,
   ) {
@@ -110,7 +170,7 @@ export class GatewaysController {
   @ApiOperation({ summary: 'Execute command on gateway' })
   async executeCommand(
     @Param('id') id: string,
-    @Body() body: { type: string; payload?: any },
+    @Body() body: ExecuteCommandDto,
     @CurrentUser('id') userId: string,
     @CurrentUser('tenantId') tenantId: string,
   ) {

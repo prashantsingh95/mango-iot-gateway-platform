@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Search, RefreshCw } from 'lucide-react';
+import { Plus, Search, RefreshCw, FolderTree } from 'lucide-react';
 import Link from 'next/link';
 import { formatRelativeTime } from '@/lib/utils';
 
@@ -42,6 +42,12 @@ export default function GatewaysPage() {
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" onClick={() => refetch()} aria-label="Refresh gateway list">
             <RefreshCw className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" asChild>
+            <Link href="/gateways/groups">
+              <FolderTree className="mr-2 h-4 w-4" />
+              Groups
+            </Link>
           </Button>
           <Button asChild>
             <Link href="/gateways/new">

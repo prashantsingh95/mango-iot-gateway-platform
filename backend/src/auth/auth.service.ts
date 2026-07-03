@@ -69,7 +69,7 @@ export class AuthService {
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
     if (!isPasswordValid) throw new UnauthorizedException('Invalid credentials');
 
-    if (!user.isActive) throw new UnauthorizedException('Account is deactivated');
+    if (!user.isActive) throw new UnauthorizedException('Invalid credentials');
 
     if (tenantId && user.tenantId !== tenantId) throw new UnauthorizedException('Invalid tenant');
 
@@ -97,16 +97,33 @@ export class AuthService {
         secret: this.configService.get<string>('jwt.secret'),
       });
 
+      if (payload.type !== 'refresh') throw new UnauthorizedException('Invalid refresh token');
+
       const user = await this.prisma.user.findUnique({
         where: { id: payload.sub },
       });
 
       if (!user || !user.isActive) throw new UnauthorizedException('Invalid refresh token');
 
-      return this.generateTokens(user);
+      const tokens = await this.generateTokens(user);
+
+      await this.prisma.session.updateMany({
+        where: { userId: user.id, isActive: true },
+        data: { isActive: false },
+      });
+
+      return tokens;
     } catch {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
+  }
+
+  async logout(userId: string) {
+    await this.prisma.session.updateMany({
+      where: { userId, isActive: true },
+      data: { isActive: false },
+    });
+    return { message: 'Logged out successfully' };
   }
 
   async validateUser(userId: string) {

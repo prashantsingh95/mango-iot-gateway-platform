@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { CacheService } from '../cache/cache.service';
 import { LoggingService } from '../logging/logging.service';
@@ -20,6 +20,8 @@ export class GatewaysService {
     private readonly wsGateway: WebSocketGatewayImpl,
   ) {}
 
+  private readonly allowedSortFields = ['createdAt', 'updatedAt', 'name', 'status', 'deviceId', 'serialNumber', 'lastHeartbeat'];
+
   async findAll(params: {
     page?: number;
     limit?: number;
@@ -32,7 +34,8 @@ export class GatewaysService {
     groupId?: string;
     tags?: string[];
   }) {
-    const { page = 1, limit = 20, sortBy = 'createdAt', sortOrder = 'desc', search, status, tenantId, siteId, groupId, tags } = params;
+    let { page = 1, limit = 20, sortBy = 'createdAt', sortOrder = 'desc', search, status, tenantId, siteId, groupId, tags } = params;
+    if (!this.allowedSortFields.includes(sortBy)) sortBy = 'createdAt';
     const skip = (page - 1) * limit;
 
     const where: any = { tenantId };
@@ -72,8 +75,9 @@ export class GatewaysService {
     const gateway = await this.prisma.gateway.findFirst({
       where: { id, tenantId },
       include: {
-        site: true,
-        group: true,
+        owner: { select: { id: true, name: true, email: true } },
+        site: { select: { id: true, name: true } },
+        group: { select: { id: true, name: true } },
         configProfile: { include: { versions: { orderBy: { version: 'desc' }, take: 5 } } },
         connectedDevices: true,
       },
@@ -147,11 +151,21 @@ export class GatewaysService {
   }
 
   async bulkImport(gateways: any[], tenantId: string) {
-    return this.prisma.$transaction(
-      gateways.map((gw) =>
-        this.prisma.gateway.create({ data: { ...gw, tenantId } }),
-      ),
-    );
+    if (gateways.length > 500) {
+      throw new BadRequestException('Bulk import limited to 500 gateways');
+    }
+    const results = { created: 0, errors: [] as { index: number; error: string }[] };
+    for (let i = 0; i < gateways.length; i++) {
+      try {
+        await this.prisma.gateway.create({
+          data: { ...gateways[i], tenantId, status: 'PROVISIONING' },
+        });
+        results.created++;
+      } catch (err) {
+        results.errors.push({ index: i, error: err.message });
+      }
+    }
+    return results;
   }
 
   async getGatewayStats(tenantId: string) {
@@ -174,7 +188,7 @@ export class GatewaysService {
       totalDevices,
     };
 
-    await this.cache.set(cacheKey, stats, 30000);
+    await this.cache.set(cacheKey, stats, 300000);
     return stats;
   }
 
@@ -286,6 +300,88 @@ export class GatewaysService {
     return this.prisma.gatewayGroup.findMany({
       where: { tenantId },
       include: { _count: { select: { gateways: true } } },
+    });
+  }
+
+  async createGroup(data: { name: string; description?: string; parentId?: string }, tenantId: string, userId: string) {
+    return this.prisma.gatewayGroup.create({
+      data: {
+        name: data.name,
+        description: data.description,
+        parentId: data.parentId,
+        tenantId,
+      },
+      include: { _count: { select: { gateways: true } } },
+    });
+  }
+
+  async updateGroup(id: string, data: { name?: string; description?: string; parentId?: string }, tenantId: string) {
+    const group = await this.prisma.gatewayGroup.findFirst({ where: { id, tenantId } });
+    if (!group) throw new NotFoundException('Group not found');
+    return this.prisma.gatewayGroup.update({
+      where: { id },
+      data,
+      include: { _count: { select: { gateways: true } } },
+    });
+  }
+
+  async deleteGroup(id: string, tenantId: string) {
+    const group = await this.prisma.gatewayGroup.findFirst({ where: { id, tenantId } });
+    if (!group) throw new NotFoundException('Group not found');
+    await this.prisma.gateway.updateMany({ where: { groupId: id }, data: { groupId: null } });
+    return this.prisma.gatewayGroup.delete({ where: { id } });
+  }
+
+  async assignGatewayToGroup(gatewayId: string, groupId: string | null, tenantId: string) {
+    const gateway = await this.prisma.gateway.findFirst({ where: { id: gatewayId, tenantId } });
+    if (!gateway) throw new NotFoundException('Gateway not found');
+    if (groupId) {
+      const group = await this.prisma.gatewayGroup.findFirst({ where: { id: groupId, tenantId } });
+      if (!group) throw new NotFoundException('Group not found');
+    }
+    return this.prisma.gateway.update({
+      where: { id: gatewayId },
+      data: { groupId },
+    });
+  }
+
+  async assignOwner(gatewayId: string, ownerId: string | null, tenantId: string) {
+    const gateway = await this.prisma.gateway.findFirst({ where: { id: gatewayId, tenantId } });
+    if (!gateway) throw new NotFoundException('Gateway not found');
+    if (ownerId) {
+      const user = await this.prisma.user.findFirst({ where: { id: ownerId, tenantId } });
+      if (!user) throw new NotFoundException('User not found');
+    }
+    return this.prisma.gateway.update({
+      where: { id: gatewayId },
+      data: { ownerId },
+    });
+  }
+
+  async getGatewayAccess(gatewayId: string, tenantId: string) {
+    const gateway = await this.prisma.gateway.findFirst({ where: { id: gatewayId, tenantId } });
+    if (!gateway) throw new NotFoundException('Gateway not found');
+    return this.prisma.gatewayAccess.findMany({
+      where: { gatewayId },
+      include: { user: { select: { id: true, name: true, email: true } } },
+    });
+  }
+
+  async setGatewayAccess(gatewayId: string, userId: string, level: string, tenantId: string) {
+    const gateway = await this.prisma.gateway.findFirst({ where: { id: gatewayId, tenantId } });
+    if (!gateway) throw new NotFoundException('Gateway not found');
+    const user = await this.prisma.user.findFirst({ where: { id: userId, tenantId } });
+    if (!user) throw new NotFoundException('User not found');
+
+    if (level === 'NONE') {
+      await this.prisma.gatewayAccess.deleteMany({ where: { gatewayId, userId } });
+      return { removed: true };
+    }
+
+    return this.prisma.gatewayAccess.upsert({
+      where: { gatewayId_userId: { gatewayId, userId } },
+      update: { level: level as any },
+      create: { gatewayId, userId, level: level as any, tenantId },
     });
   }
 }

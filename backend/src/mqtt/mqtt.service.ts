@@ -52,6 +52,14 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       this.logger.warn('Reconnecting to MQTT broker...');
     });
 
+    this.client.on('close', () => {
+      this.logger.warn('MQTT connection closed');
+    });
+
+    this.client.on('close', () => {
+      this.logger.warn('MQTT connection closed');
+    });
+
     this.client.on('offline', () => {
       this.logger.warn('MQTT client offline');
     });
@@ -72,25 +80,25 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  private handleMessage(topic: string, message: string) {
+  private async handleMessage(topic: string, message: string) {
     try {
       const parts = topic.split('/');
       const deviceId = parts[1];
-      const type = parts[2];
+      const topicType = parts.slice(2).join('/');
       const data = JSON.parse(message);
 
-      switch (type) {
+      switch (topicType) {
         case 'telemetry':
-          this.handleTelemetry(deviceId, data);
+          await this.handleTelemetry(deviceId, data);
           break;
         case 'status':
-          this.handleStatus(deviceId, data);
+          await this.handleStatus(deviceId, data);
           break;
         case 'log':
-          this.handleLog(deviceId, data);
+          await this.handleLog(deviceId, data);
           break;
         case 'command/response':
-          this.handleCommandResponse(deviceId, data);
+          await this.handleCommandResponse(deviceId, data);
           break;
       }
     } catch (err) {
@@ -188,8 +196,12 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
   }
 
   publish(topic: string, message: any) {
-    if (this.client?.connected) {
-      this.client.publish(topic, JSON.stringify(message), { qos: 1 });
+    if (!this.client?.connected) {
+      this.logger.warn(`Cannot publish to ${topic}: MQTT client not connected`);
+      return;
     }
+    this.client.publish(topic, JSON.stringify(message), { qos: 1 }, (err) => {
+      if (err) this.logger.error(`Publish failed to ${topic}: ${err.message}`);
+    });
   }
 }

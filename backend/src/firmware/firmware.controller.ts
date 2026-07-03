@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards, Req, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards, Req, BadRequestException, StreamableFile } from '@nestjs/common';
 import { FastifyRequest } from 'fastify';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { FirmwareService } from './firmware.service';
@@ -7,6 +7,7 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { PaginationDto } from '../common/dto/pagination.dto';
+import { CreateFirmwareDto, UpdateFirmwareDto, DeployFirmwareDto } from './dto/firmware.dto';
 
 @ApiTags('Firmware')
 @ApiBearerAuth()
@@ -35,7 +36,7 @@ export class FirmwareController {
   @Roles('ADMIN', 'SUPER_ADMIN')
   @ApiOperation({ summary: 'Upload firmware release' })
   async create(
-    @Body() body: any,
+    @Body() body: CreateFirmwareDto,
     @CurrentUser('id') userId: string,
     @CurrentUser('tenantId') tenantId: string,
   ) {
@@ -47,7 +48,7 @@ export class FirmwareController {
   @ApiOperation({ summary: 'Update firmware release' })
   async update(
     @Param('id') id: string,
-    @Body() body: any,
+    @Body() body: UpdateFirmwareDto,
     @CurrentUser('tenantId') tenantId: string,
   ) {
     return this.firmwareService.update(id, body, tenantId);
@@ -71,9 +72,10 @@ export class FirmwareController {
     const file = await req.file();
     if (!file) throw new BadRequestException('No file uploaded');
 
+    const safeFilename = file.filename.replace(/[^a-zA-Z0-9._-]/g, '');
+
     const allowedExtensions = ['.bin', '.hex', '.img', '.tar.gz', '.gz'];
-    const ext = '.' + file.filename.split('.').slice(1).join('.');
-    if (!allowedExtensions.some((e) => file.filename.toLowerCase().endsWith(e))) {
+    if (!allowedExtensions.some((e) => safeFilename.toLowerCase().endsWith(e))) {
       throw new BadRequestException(`File type not allowed. Allowed: ${allowedExtensions.join(', ')}`);
     }
 
@@ -91,11 +93,17 @@ export class FirmwareController {
     const buffer = Buffer.concat(chunks);
 
     return this.firmwareService.uploadFile(id, {
-      filename: file.filename.replace(/[^a-zA-Z0-9._-]/g, ''),
+      filename: safeFilename,
       mimetype: file.mimetype,
       size: buffer.length,
       buffer,
     }, tenantId);
+  }
+
+  @Get(':id/download')
+  @ApiOperation({ summary: 'Download firmware binary' })
+  async download(@Param('id') id: string, @CurrentUser('tenantId') tenantId: string) {
+    return this.firmwareService.download(id, tenantId);
   }
 
   @Post(':id/deploy')
@@ -103,7 +111,7 @@ export class FirmwareController {
   @ApiOperation({ summary: 'Deploy firmware to gateways' })
   async deploy(
     @Param('id') id: string,
-    @Body() body: { gatewayIds: string[] },
+    @Body() body: DeployFirmwareDto,
     @CurrentUser('tenantId') tenantId: string,
   ) {
     return this.firmwareService.deploy(id, body.gatewayIds, tenantId);

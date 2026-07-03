@@ -72,11 +72,20 @@ export class TerminalGateway implements OnGatewayConnection, OnGatewayDisconnect
 
       const gateway = await this.prisma.gateway.findFirst({
         where: { id: gatewayId, tenantId },
-        select: { id: true, deviceId: true, ipAddress: true },
+        select: { id: true, deviceId: true, ipAddress: true, ownerId: true },
       });
 
       if (!gateway) {
         client.emit('error', { message: 'Gateway not found' });
+        return;
+      }
+
+      const access = await this.prisma.gatewayAccess.findFirst({
+        where: { gatewayId, userId: client.data.userId, level: { in: ['CONTROL', 'ADMIN'] } },
+      });
+
+      if (!access && gateway.ownerId !== client.data.userId) {
+        client.emit('error', { message: 'Insufficient permissions for terminal access' });
         return;
       }
 
@@ -152,8 +161,11 @@ export class TerminalGateway implements OnGatewayConnection, OnGatewayDisconnect
 
       if (sshPrivateKey) {
         connectConfig.privateKey = sshPrivateKey;
+      } else if (settings.sshPassword) {
+        connectConfig.password = settings.sshPassword;
       } else {
-        connectConfig.password = settings.sshPassword || 'raspberry';
+        client.emit('error', { message: 'No SSH credentials configured for tenant' });
+        return;
       }
 
       ssh.connect(connectConfig);

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger, StreamableFile } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { LoggingService } from '../logging/logging.service';
 import { MqttService } from '../mqtt/mqtt.service';
@@ -17,6 +17,8 @@ export class FirmwareService {
     private readonly mqttService: MqttService,
   ) {}
 
+  private readonly allowedSortFields = ['createdAt', 'updatedAt', 'name', 'version', 'status'];
+
   async findAll(params: {
     page?: number;
     limit?: number;
@@ -25,7 +27,8 @@ export class FirmwareService {
     status?: string;
     tenantId: string;
   }) {
-    const { page = 1, limit = 20, sortBy = 'createdAt', sortOrder = 'desc', status, tenantId } = params;
+    let { page = 1, limit = 20, sortBy = 'createdAt', sortOrder = 'desc', status, tenantId } = params;
+    if (!this.allowedSortFields.includes(sortBy)) sortBy = 'createdAt';
     const skip = (page - 1) * limit;
 
     const where: any = { tenantId };
@@ -92,11 +95,33 @@ export class FirmwareService {
     });
   }
 
+  async download(id: string, tenantId: string): Promise<StreamableFile> {
+    const firmware = await this.prisma.firmwareRelease.findFirst({
+      where: { id, tenantId },
+    });
+    if (!firmware) throw new NotFoundException('Firmware release not found');
+
+    if (!fs.existsSync(firmware.s3Path)) {
+      throw new NotFoundException('Firmware binary file not found on disk');
+    }
+
+    const fileStream = fs.createReadStream(firmware.s3Path);
+    return new StreamableFile(fileStream, {
+      type: 'application/octet-stream',
+      disposition: `attachment; filename="${firmware.filename}"`,
+      length: firmware.fileSize,
+    });
+  }
+
   async delete(id: string, tenantId: string) {
     const existing = await this.prisma.firmwareRelease.findFirst({ where: { id, tenantId } });
     if (!existing) throw new NotFoundException('Firmware release not found');
 
     await this.prisma.firmwareRelease.delete({ where: { id } });
+
+    if (existing.s3Path && fs.existsSync(existing.s3Path)) {
+      fs.unlinkSync(existing.s3Path);
+    }
 
     await this.loggingService.logAudit({
       action: 'FIRMWARE_DELETE',

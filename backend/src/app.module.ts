@@ -20,7 +20,9 @@ import { AuditModule } from './audit/audit.module';
 import { SettingsModule } from './settings/settings.module';
 import { HealthModule } from './health/health.module';
 import { TerminalModule } from './terminal/terminal.module';
+import { UptimeModule } from './uptime/uptime.module';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
+import { TenantGuard } from './common/guards/tenant.guard';
 
 @Module({
   imports: [
@@ -50,11 +52,16 @@ import { AllExceptionsFilter } from './common/filters/http-exception.filter';
     SettingsModule,
     HealthModule,
     TerminalModule,
+    UptimeModule,
   ],
   providers: [
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: TenantGuard,
     },
     {
       provide: APP_FILTER,
