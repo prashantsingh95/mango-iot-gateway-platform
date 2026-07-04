@@ -112,14 +112,14 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       select: { id: true, tenantId: true },
     });
 
-    // Extract root partition disk usage from the disk object
+    // Extract disk usage — handle both flat float64 and nested object
     let diskUsage: number | null = null;
-    if (data.disk && typeof data.disk === 'object') {
-      // Use root partition (/) if available, otherwise first partition
+    if (typeof data.disk === 'number') {
+      diskUsage = data.disk;
+    } else if (data.disk && typeof data.disk === 'object') {
       if (data.disk['/'] && typeof data.disk['/'].used_pct === 'number') {
         diskUsage = data.disk['/'].used_pct;
       } else {
-        // Fallback to first partition with used_pct
         const partitions = Object.values(data.disk).filter((p: any) => p && typeof p.used_pct === 'number');
         if (partitions.length > 0) {
           diskUsage = (partitions[0] as any).used_pct;

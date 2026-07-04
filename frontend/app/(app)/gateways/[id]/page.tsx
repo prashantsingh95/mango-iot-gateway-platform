@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
 import { gatewaysApi } from '@/lib/api-client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
-import { ArrowLeft, Terminal as TerminalIcon, RefreshCw, Power, Trash2 } from 'lucide-react';
+import { ArrowLeft, Terminal as TerminalIcon, RefreshCw, Power, Trash2, Pencil } from 'lucide-react';
 import Link from 'next/link';
 import { formatRelativeTime } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -18,6 +19,9 @@ import { CommandsTab } from './commands-tab';
 import { FirmwareTab } from './firmware-tab';
 import { TerminalTab } from './terminal-tab';
 import { UptimeTab } from '@/components/gateways/uptime-tab';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 const statusVariantMap: Record<string, 'success' | 'destructive' | 'warning' | 'info' | 'secondary'> = {
   ONLINE: 'success',
@@ -47,6 +51,37 @@ export default function GatewayDetailPage() {
       router.push('/gateways');
     },
     onError: () => toast.error('Failed to delete gateway'),
+  });
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: '', serialNumber: '', model: '', manufacturer: '',
+    hardwareVersion: '', osVersion: '', macAddress: '', firmwareVersion: '',
+  });
+
+  useEffect(() => {
+    if (gateway) {
+      setEditForm({
+        name: gateway.name || '',
+        serialNumber: gateway.serialNumber || '',
+        model: gateway.model || '',
+        manufacturer: gateway.manufacturer || '',
+        hardwareVersion: gateway.hardwareVersion || '',
+        osVersion: gateway.osVersion || '',
+        macAddress: gateway.macAddress || '',
+        firmwareVersion: gateway.firmwareVersion || '',
+      });
+    }
+  }, [gateway]);
+
+  const updateMutation = useMutation({
+    mutationFn: (data: any) => gatewaysApi.update(id, data),
+    onSuccess: () => {
+      toast.success('Gateway updated');
+      queryClient.invalidateQueries({ queryKey: ['gateway', id] });
+      setEditOpen(false);
+    },
+    onError: (err: any) => toast.error(err?.response?.data?.message || 'Failed to update'),
   });
 
   if (isLoading) {
@@ -95,6 +130,59 @@ export default function GatewayDetailPage() {
             <RefreshCw className="mr-2 h-4 w-4" />
             Refresh
           </Button>
+          <Dialog open={editOpen} onOpenChange={setEditOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Edit Device Profile</DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto">
+                <div className="grid gap-2">
+                  <Label>Name</Label>
+                  <Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Serial Number</Label>
+                  <Input value={editForm.serialNumber} onChange={(e) => setEditForm({ ...editForm, serialNumber: e.target.value })} />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Model</Label>
+                  <Input value={editForm.model} onChange={(e) => setEditForm({ ...editForm, model: e.target.value })} />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Manufacturer</Label>
+                  <Input value={editForm.manufacturer} onChange={(e) => setEditForm({ ...editForm, manufacturer: e.target.value })} />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Firmware Version</Label>
+                  <Input value={editForm.firmwareVersion} onChange={(e) => setEditForm({ ...editForm, firmwareVersion: e.target.value })} />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Hardware Version</Label>
+                  <Input value={editForm.hardwareVersion} onChange={(e) => setEditForm({ ...editForm, hardwareVersion: e.target.value })} />
+                </div>
+                <div className="grid gap-2">
+                  <Label>OS Version</Label>
+                  <Input value={editForm.osVersion} onChange={(e) => setEditForm({ ...editForm, osVersion: e.target.value })} />
+                </div>
+                <div className="grid gap-2">
+                  <Label>MAC Address</Label>
+                  <Input value={editForm.macAddress} onChange={(e) => setEditForm({ ...editForm, macAddress: e.target.value })} />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
+                <Button onClick={() => updateMutation.mutate(editForm)} disabled={updateMutation.isPending}>
+                  {updateMutation.isPending ? 'Saving...' : 'Save'}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
           <Button
             variant="outline"
             size="sm"

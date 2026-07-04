@@ -43,8 +43,19 @@ export class UpdateGatewayDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  @MaxLength(100)
+  deviceId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
   @MaxLength(200)
   name?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  serialNumber?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -65,6 +76,16 @@ export class UpdateGatewayDto {
   @IsOptional()
   @IsString()
   firmwareVersion?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  hardwareVersion?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  osVersion?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
