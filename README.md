@@ -1,5 +1,13 @@
 # Mango IoT Gateway Platform
 
+**Developed by Prashant Kumar** — Director & Founder, Tech Burst Solutions LLP
+
+**Business Contact:**
+- Email: business@techburstsolutions.in, iot.techburst@gmail.com
+- Phone/WhatsApp: +91 9310720730
+- Web: www.techburstsolutions.in
+- Office: New Delhi - 41, India
+
 Enterprise IoT gateway management platform. Cloud server for managing fleets of Raspberry Pi gateways via authenticated MQTT with real-time WebSocket, OTA firmware, remote shell (SSH), and Modbus/GPIO data pipelines.
 
 Sister project: **[mango-iot-gateway-client](https://github.com/mango-iot/gateway-client)** — the Go gateway agent that runs on each Pi and connects to this platform.
