@@ -152,14 +152,35 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       select: { id: true, tenantId: true },
     });
 
+    // Normalize snake_case keys (from Go client) to camelCase (backend convention)
+    const normalized: any = {};
+    for (const [k, v] of Object.entries(data)) {
+      const camelKey = k.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+      normalized[camelKey] = v;
+    }
+    data = normalized;
+
+    // Build update data with only non-null/undefined values
+    const updateData: any = {
+      status: data.status || 'ONLINE',
+      ipAddress: data.ip,
+      lastHeartbeat: new Date(),
+    };
+
+    // Only add optional fields if they have values
+    if (data.reason) updateData.statusReason = data.reason;
+    if (data.macAddress) updateData.macAddress = data.macAddress;
+    if (data.model) updateData.model = data.model;
+    if (data.manufacturer) updateData.manufacturer = data.manufacturer;
+    if (data.firmwareVer || data.firmwareVersion) updateData.firmwareVersion = data.firmwareVer || data.firmwareVersion;
+    if (data.hardwareVer || data.hardwareVersion) updateData.hardwareVersion = data.hardwareVer || data.hardwareVersion;
+    if (data.osVersion) updateData.osVersion = data.osVersion;
+    if (data.serialNumber) updateData.serialNumber = data.serialNumber;
+    if (data.uptime != null) updateData.uptime = data.uptime;
+
     await this.prisma.gateway.updateMany({
       where: { deviceId },
-      data: {
-        status: data.status || 'ONLINE',
-        statusReason: data.reason,
-        ipAddress: data.ip,
-        lastHeartbeat: new Date(),
-      },
+      data: updateData,
     });
 
     if (gateway) {

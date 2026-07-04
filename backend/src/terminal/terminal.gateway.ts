@@ -105,6 +105,11 @@ export class TerminalGateway implements OnGatewayConnection, OnGatewayDisconnect
       const sshPort = settings.sshPort || 22;
       const sshUsername = settings.sshUsername || 'pi';
 
+      let sshPassword: string | undefined;
+      if (settings.sshPassword) {
+        sshPassword = this.encryption.decrypt(settings.sshPassword);
+      }
+
       let sshPrivateKey: string | undefined;
       if (settings.sshPrivateKey) {
         sshPrivateKey = this.encryption.decrypt(settings.sshPrivateKey);
@@ -161,8 +166,8 @@ export class TerminalGateway implements OnGatewayConnection, OnGatewayDisconnect
 
       if (sshPrivateKey) {
         connectConfig.privateKey = sshPrivateKey;
-      } else if (settings.sshPassword) {
-        connectConfig.password = settings.sshPassword;
+      } else if (sshPassword) {
+        connectConfig.password = sshPassword;
       } else {
         client.emit('error', { message: 'No SSH credentials configured for tenant' });
         return;

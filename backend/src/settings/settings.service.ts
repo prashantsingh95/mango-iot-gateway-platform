@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { EncryptionService } from '../common/encryption.service';
 
-const SENSITIVE_KEYS = ['mqttPassword', 'dbPassword', 'smtpPassword', 's3SecretKey'];
+const SENSITIVE_KEYS = ['mqttPassword', 'dbPassword', 'smtpPassword', 's3SecretKey', 'sshPassword', 'sshPrivateKey'];
 
 @Injectable()
 export class SettingsService {

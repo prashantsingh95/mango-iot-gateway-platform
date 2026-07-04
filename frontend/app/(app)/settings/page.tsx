@@ -30,6 +30,9 @@ export default function SettingsPage() {
     ssl: false, caCert: '', poolMin: '2', poolMax: '10',
     timeout: '30000', schema: 'public',
   });
+  const [sshConfig, setSshConfig] = useState({
+    username: '', password: '', port: '22',
+  });
 
   const { data: settings } = useQuery({
     queryKey: ['settings'],
@@ -67,6 +70,11 @@ export default function SettingsPage() {
         timeout: settings.dbTimeout || prev.timeout,
         schema: settings.dbSchema || prev.schema,
       }));
+      setSshConfig((prev) => ({
+        ...prev,
+        username: settings.sshUsername || prev.username,
+        port: settings.sshPort || prev.port,
+      }));
     }
   }, [settings]);
 
@@ -95,6 +103,9 @@ export default function SettingsPage() {
     };
     mapKeys(mqttConfig, 'mqtt');
     mapKeys(dbConfig, 'db');
+    if (sshConfig.username) data.sshUsername = sshConfig.username;
+    if (sshConfig.password) data.sshPassword = sshConfig.password;
+    if (sshConfig.port) data.sshPort = sshConfig.port;
     saveConfigMutation.mutate(data);
   };
 
@@ -517,6 +528,42 @@ export default function SettingsPage() {
                   />
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Terminal SSH Access</CardTitle>
+              <CardDescription>SSH credentials for web-based terminal access to gateways</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="space-y-2">
+                  <Label>SSH Username</Label>
+                  <Input
+                    value={sshConfig.username}
+                    onChange={(e) => setSshConfig({ ...sshConfig, username: e.target.value })}
+                    placeholder="pi"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>SSH Password</Label>
+                  <Input
+                    type="password"
+                    value={sshConfig.password}
+                    onChange={(e) => setSshConfig({ ...sshConfig, password: e.target.value })}
+                    placeholder="Leave blank to keep current"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>SSH Port</Label>
+                  <Input
+                    value={sshConfig.port}
+                    onChange={(e) => setSshConfig({ ...sshConfig, port: e.target.value })}
+                    placeholder="22"
+                  />
+                </div>
+              </div>
             </CardContent>
           </Card>
 
