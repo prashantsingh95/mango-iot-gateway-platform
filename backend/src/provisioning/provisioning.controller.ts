@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Param, Query, UseGuards, UsePipes } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { ProvisioningService } from './provisioning.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -7,6 +7,17 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { CreateProvisioningTokenDto, ProvisionGatewayDto } from './dto/provisioning.dto';
+import { IsString, IsOptional } from 'class-validator';
+import { plainToInstance } from 'class-transformer';
+
+class GetDeviceConfigQueryDto {
+  @IsString()
+  deviceId: string;
+
+  @IsOptional()
+  @IsString()
+  tenantId?: string;
+}
 
 @ApiTags('Provisioning')
 @Controller('provisioning')
@@ -58,13 +69,15 @@ export class ProvisioningController {
 
   @Get('config')
   @Public()
+  @UsePipes() // Skip global ValidationPipe for this endpoint
   @ApiOperation({ summary: 'Get device configuration (merged: tenant → group → device)' })
-  @ApiQuery({ name: 'deviceId', required: true, description: 'Device ID (MAC-based)' })
+  @ApiQuery({ name: 'deviceId', required: true, description: 'Device ID (MAC-based, no colons)' })
   @ApiQuery({ name: 'tenantId', required: false, description: 'Tenant ID (optional, resolved from device)' })
   async getDeviceConfig(
     @Query('deviceId') deviceId: string,
     @Query('tenantId') tenantId?: string,
   ) {
+    if (!deviceId) throw new Error('deviceId is required');
     return this.provisioningService.getDeviceConfig(deviceId, tenantId);
   }
 }

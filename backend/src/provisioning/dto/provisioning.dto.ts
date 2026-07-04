@@ -87,3 +87,14 @@ export class ProvisionGatewayDto {
   @Type(() => GatewayInfoDto)
   gateway: GatewayInfoDto;
 }
+
+export class GetDeviceConfigQueryDto {
+  @ApiProperty({ description: 'Device ID (MAC-based, no colons)' })
+  @IsString()
+  deviceId: string;
+
+  @ApiPropertyOptional({ description: 'Tenant ID (optional, resolved from device)' })
+  @IsOptional()
+  @IsString()
+  tenantId?: string;
+}
