@@ -55,15 +55,17 @@ export class UptimeService {
 
     const now = new Date();
     const slotInterval = 15; // 15 minutes
+    const offlineThreshold = 5 * 60 * 1000; // 5 minutes without heartbeat = offline
 
     for (const gw of gateways) {
       try {
         const slotStart = this.getSlotStart(now, slotInterval);
         const slotEnd = new Date(slotStart.getTime() + slotInterval * 60 * 1000);
 
+        const lastHb = gw.lastHeartbeat ? gw.lastHeartbeat.getTime() : 0;
         const isUp = gw.status === 'ONLINE' &&
           gw.lastHeartbeat != null &&
-          (now.getTime() - gw.lastHeartbeat.getTime()) < 2 * slotInterval * 60 * 1000;
+          (now.getTime() - lastHb) < 2 * slotInterval * 60 * 1000;
 
         await this.prisma.gatewayUptimeSlot.upsert({
           where: {
@@ -78,6 +80,15 @@ export class UptimeService {
             isUp,
           },
         });
+
+        // Mark gateway OFFLINE if no heartbeat in 5 minutes
+        if (gw.status === 'ONLINE' && (now.getTime() - lastHb) > offlineThreshold) {
+          await this.prisma.gateway.update({
+            where: { id: gw.id },
+            data: { status: 'OFFLINE' },
+          });
+          this.logger.warn(`Gateway ${gw.deviceId} marked OFFLINE (no heartbeat for >5min)`);
+        }
       } catch (err) {
         this.logger.error(`Failed to process slot for gateway ${gw.deviceId}: ${err.message}`);
       }

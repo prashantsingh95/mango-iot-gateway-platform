@@ -130,6 +130,7 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
     await this.prisma.gateway.updateMany({
       where: { deviceId },
       data: {
+        status: data.status || 'ONLINE',
         cpuUsage: data.cpu,
         memoryUsage: data.memory,
         diskUsage,
