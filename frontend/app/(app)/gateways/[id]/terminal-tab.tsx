@@ -19,11 +19,88 @@ export function TerminalTab({ gatewayId }: { gatewayId: string }) {
   const socketRef = useRef<Socket | null>(null);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showLogin, setShowLogin] = useState(true);
+  const [sshUser, setSshUser] = useState('prashant');
+  const [sshPass, setSshPass] = useState('Dev_Prashant65');
+  const [sshPort, setSshPort] = useState('22');
 
-  useEffect(() => {
+  const connectTerminal = (username: string, password: string, port: string) => {
     const token = localStorage.getItem('accessToken');
     if (!token) return;
 
+    setShowLogin(false);
+    setError(null);
+
+    if (socketRef.current?.connected) {
+      socketRef.current.disconnect();
+    }
+
+    const term = xtermRef.current;
+    if (term) {
+      term.reset();
+    }
+
+    const socket: Socket = io(`${WS_URL}/terminal`, {
+      auth: { token },
+      transports: ['websocket', 'polling'],
+    });
+    socketRef.current = socket;
+
+    socket.on('connect', () => {
+      socket.emit('open', {
+        gatewayId,
+        rows: xtermRef.current?.rows || 24,
+        cols: xtermRef.current?.cols || 80,
+        sshUsername: username,
+        sshPassword: password,
+        sshPort: parseInt(port, 10) || 22,
+      });
+      xtermRef.current?.focus();
+    });
+
+    socket.on('connected', () => {
+      setConnected(true);
+      setError(null);
+    });
+
+    socket.on('output', (data: { data: string }) => {
+      xtermRef.current?.write(typeof data.data === 'string'
+        ? atob(data.data)
+        : new Uint8Array(atob(data.data).split('').map((c) => c.charCodeAt(0))));
+    });
+
+    socket.on('error', (data: { message: string }) => {
+      setError(data.message);
+      setConnected(false);
+      xtermRef.current?.write(`\r\n\x1b[31mError: ${data.message}\x1b[0m\r\n`);
+    });
+
+    socket.on('closed', () => {
+      setConnected(false);
+      setShowLogin(true);
+    });
+
+    socket.on('disconnect', () => {
+      setConnected(false);
+      setShowLogin(true);
+    });
+
+    if (xtermRef.current) {
+      xtermRef.current.onData((data: string) => {
+        if (socket.connected) {
+          socket.emit('input', { data: btoa(data) });
+        }
+      });
+
+      xtermRef.current.onResize(({ rows, cols }) => {
+        if (socket.connected) {
+          socket.emit('resize', { rows, cols });
+        }
+      });
+    }
+  };
+
+  useEffect(() => {
     const term = new Terminal({
       cursorBlink: true,
       cursorStyle: 'block',
@@ -69,74 +146,80 @@ export function TerminalTab({ gatewayId }: { gatewayId: string }) {
     };
     window.addEventListener('resize', resizeHandler);
 
-    const socket: Socket = io(`${WS_URL}/terminal`, {
-      auth: { token },
-      transports: ['websocket', 'polling'],
-    });
-    socketRef.current = socket;
-
-    socket.on('connect', () => {
-      socket.emit('open', { gatewayId, rows: term.rows, cols: term.cols });
-      term.focus();
-    });
-
-    socket.on('connected', () => {
-      setConnected(true);
-      setError(null);
-    });
-
-    socket.on('output', (data: { data: string }) => {
-      term.write(typeof data.data === 'string'
-        ? atob(data.data)
-        : new Uint8Array(atob(data.data).split('').map((c) => c.charCodeAt(0))));
-    });
-
-    socket.on('error', (data: { message: string }) => {
-      setError(data.message);
-      setConnected(false);
-      term.write(`\r\n\x1b[31mError: ${data.message}\x1b[0m\r\n`);
-    });
-
-    socket.on('closed', () => {
-      setConnected(false);
-    });
-
-    socket.on('disconnect', () => {
-      setConnected(false);
-    });
-
-    term.onData((data: string) => {
-      if (socket.connected) {
-        socket.emit('input', { data: btoa(data) });
-      }
-    });
-
-    term.onResize(({ rows, cols }) => {
-      if (socket.connected) {
-        socket.emit('resize', { rows, cols });
-      }
-    });
-
     return () => {
       window.removeEventListener('resize', resizeHandler);
-      socket.disconnect();
+      socketRef.current?.disconnect();
       term.dispose();
     };
-  }, [gatewayId]);
+  }, []);
 
   const handleReconnect = () => {
-    setError(null);
-    const token = localStorage.getItem('accessToken');
-    if (token && socketRef.current) {
-      socketRef.current.auth = { token };
-      socketRef.current.connect();
-      socketRef.current.emit('open', {
-        gatewayId,
-        rows: xtermRef.current?.rows || 24,
-        cols: xtermRef.current?.cols || 80,
-      });
-    }
+    setShowLogin(true);
   };
+
+  if (showLogin) {
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <TerminalIcon className="h-5 w-5" />
+              SSH Terminal
+            </CardTitle>
+            <Badge variant="secondary" className="gap-1">
+              <WifiOff className="h-3 w-3" />
+              Disconnected
+            </Badge>
+          </div>
+          {error && (
+            <div className="flex items-center gap-2 text-sm text-destructive mt-2">
+              <AlertTriangle className="h-4 w-4" />
+              {error}
+            </div>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="space-y-2">
+              <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">SSH Username</label>
+              <input
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                value={sshUser}
+                onChange={(e) => setSshUser(e.target.value)}
+                placeholder="pi"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">SSH Password</label>
+              <input
+                type="password"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                value={sshPass}
+                onChange={(e) => setSshPass(e.target.value)}
+                placeholder="password"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">SSH Port</label>
+              <input
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                value={sshPort}
+                onChange={(e) => setSshPort(e.target.value)}
+                placeholder="22"
+              />
+            </div>
+          </div>
+          {error && (
+            <p className="text-sm text-destructive">{error}</p>
+          )}
+          <Button onClick={() => connectTerminal(sshUser, sshPass, sshPort)}>
+            <TerminalIcon className="mr-2 h-4 w-4" />
+            Connect
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>

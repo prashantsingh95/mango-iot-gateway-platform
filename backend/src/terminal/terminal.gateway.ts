@@ -65,7 +65,7 @@ export class TerminalGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   @SubscribeMessage('open')
-  async handleOpen(client: Socket, data: { gatewayId: string; rows?: number; cols?: number }) {
+  async handleOpen(client: Socket, data: { gatewayId: string; rows?: number; cols?: number; sshUsername?: string; sshPassword?: string; sshPort?: number }) {
     try {
       const { gatewayId, rows = 24, cols = 80 } = data;
       const tenantId = client.data.tenantId;
@@ -94,25 +94,37 @@ export class TerminalGateway implements OnGatewayConnection, OnGatewayDisconnect
         return;
       }
 
-      const tenant = await this.prisma.tenant.findUnique({
-        where: { id: tenantId },
-        select: { settings: true },
-      });
-
-      const settings = (tenant?.settings as Record<string, any>) || {};
-
       const sshHost = gateway.ipAddress;
-      const sshPort = settings.sshPort || 22;
-      const sshUsername = settings.sshUsername || 'pi';
+      let sshPort = data.sshPort || 22;
+      let sshUsername = data.sshUsername || 'pi';
 
       let sshPassword: string | undefined;
-      if (settings.sshPassword) {
-        sshPassword = this.encryption.decrypt(settings.sshPassword);
+      let sshPrivateKey: string | undefined;
+      if (data.sshPassword) {
+        // Client provided interactive credentials — use as password
+        sshPassword = data.sshPassword;
+      } else {
+        // Fall back to tenant settings
+        const tenant = await this.prisma.tenant.findUnique({
+          where: { id: tenantId },
+          select: { settings: true },
+        });
+        const settings = (tenant?.settings as Record<string, any>) || {};
+
+        const settingsSshPort = settings.sshPort || 22;
+        if (settingsSshPort !== 22) sshPort = settingsSshPort;
+        sshUsername = settings.sshUsername || sshUsername;
+
+        if (settings.sshPrivateKey) {
+          sshPrivateKey = this.encryption.decrypt(settings.sshPrivateKey);
+        } else if (settings.sshPassword) {
+          sshPassword = this.encryption.decrypt(settings.sshPassword);
+        }
       }
 
-      let sshPrivateKey: string | undefined;
-      if (settings.sshPrivateKey) {
-        sshPrivateKey = this.encryption.decrypt(settings.sshPrivateKey);
+      if (!sshPassword && !sshPrivateKey) {
+        client.emit('error', { message: 'No SSH credentials provided' });
+        return;
       }
 
       const ssh = new SSHClient();
