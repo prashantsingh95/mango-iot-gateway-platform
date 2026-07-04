@@ -230,6 +230,7 @@ model GatewayGroup {
   name        String
   description String?
   metadata    Json?
+  config      Json?     // Fleet-level config overrides (monitoring, MQTT, etc.)
   tenantId    String
   parentId    String?
   createdAt   DateTime  @default(now())

@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { ProvisioningService } from './provisioning.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -54,5 +54,17 @@ export class ProvisioningController {
     @Body() body: ProvisionGatewayDto,
   ) {
     return this.provisioningService.provisionGateway(body.token, body.gateway);
+  }
+
+  @Get('config')
+  @Public()
+  @ApiOperation({ summary: 'Get device configuration (merged: tenant → group → device)' })
+  @ApiQuery({ name: 'deviceId', required: true, description: 'Device ID (MAC-based)' })
+  @ApiQuery({ name: 'tenantId', required: false, description: 'Tenant ID (optional, resolved from device)' })
+  async getDeviceConfig(
+    @Query('deviceId') deviceId: string,
+    @Query('tenantId') tenantId?: string,
+  ) {
+    return this.provisioningService.getDeviceConfig(deviceId, tenantId);
   }
 }
