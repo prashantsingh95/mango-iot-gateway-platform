@@ -18,6 +18,41 @@ export class GatewayInfoDto {
   @ApiProperty()
   @IsString()
   serialNumber: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  firmwareVersion?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  hardwareVersion?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  macAddress?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  manufacturer?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  model?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  osVersion?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  tenantId?: string;
 }
 
 export class CreateProvisioningTokenDto {
