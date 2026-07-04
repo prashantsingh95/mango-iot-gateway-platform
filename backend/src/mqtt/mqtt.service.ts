@@ -141,6 +141,30 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       },
     });
 
+    // Save historical metric sample (1 per 5 min per gateway)
+    if (gateway) {
+      const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
+      const recent = await this.prisma.gatewayMetric.findFirst({
+        where: { gatewayId: gateway.id, timestamp: { gte: fiveMinAgo } },
+        select: { id: true },
+      });
+      if (!recent) {
+        await this.prisma.gatewayMetric.create({
+          data: {
+            gatewayId: gateway.id,
+            tenantId: gateway.tenantId,
+            cpuUsage: data.cpu,
+            memoryUsage: data.memory,
+            diskUsage,
+            temperature: data.temperature,
+            signalStrength: data.signal,
+            voltage: data.voltage,
+            batteryLevel: data.battery,
+          },
+        });
+      }
+    }
+
     if (gateway) {
       this.wsGateway.emitGatewayTelemetry(gateway.tenantId, gateway.id, data);
     }

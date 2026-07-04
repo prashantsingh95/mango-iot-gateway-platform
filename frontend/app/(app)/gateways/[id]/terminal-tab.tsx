@@ -159,6 +159,17 @@ export function TerminalTab({ gatewayId }: { gatewayId: string }) {
     };
   }, []);
 
+  // Fit terminal when transitioning from login to terminal view
+  useEffect(() => {
+    if (!showLogin && fitAddonRef.current) {
+      // Small delay to let the DOM transition from display:none to display:block
+      const timer = setTimeout(() => {
+        try { fitAddonRef.current?.fit(); } catch {}
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [showLogin]);
+
   const handleReconnect = () => {
     setShowLogin(true);
   };

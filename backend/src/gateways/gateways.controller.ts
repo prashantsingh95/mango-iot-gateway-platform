@@ -118,6 +118,17 @@ export class GatewaysController {
     return this.gatewaysService.findOne(id, tenantId);
   }
 
+  @Get(':id/metrics')
+  @ApiOperation({ summary: 'Get gateway metric history' })
+  async getMetrics(
+    @Param('id') id: string,
+    @CurrentUser('tenantId') tenantId: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.gatewaysService.getMetricHistory(id, tenantId, from, to);
+  }
+
   @Post()
   @Roles('ADMIN', 'SUPER_ADMIN', 'OPERATOR')
   @ApiOperation({ summary: 'Create a new gateway' })
@@ -157,12 +168,6 @@ export class GatewaysController {
     @CurrentUser('tenantId') tenantId: string,
   ) {
     return this.gatewaysService.delete(id, userId, tenantId);
-  }
-
-  @Get(':id/metrics')
-  @ApiOperation({ summary: 'Get gateway metrics' })
-  async getMetrics(@Param('id') id: string, @CurrentUser('tenantId') tenantId: string) {
-    return this.gatewaysService.getGatewayMetrics(id, tenantId);
   }
 
   @Post(':id/commands')

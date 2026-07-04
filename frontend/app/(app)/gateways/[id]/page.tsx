@@ -243,7 +243,7 @@ export default function GatewayDetailPage() {
                   ['Uptime', gateway.uptime ? `${Math.floor(gateway.uptime / 3600)}h` : 'N/A'],
                   ['Last Heartbeat', gateway.lastHeartbeat ? formatRelativeTime(gateway.lastHeartbeat) : 'Never'],
                   ['Temperature', gateway.temperature != null ? `${gateway.temperature}°C` : 'N/A'],
-                  ['Battery', gateway.batteryLevel != null ? `${gateway.batteryLevel}%` : 'N/A'],
+                  ['Voltage', gateway.voltage != null ? `${gateway.voltage}V` : 'N/A'],
                   ['Owner', gateway.owner?.name || '-'],
                   ['Group', gateway.group?.name || '-'],
                   ['Site', gateway.site?.name || '-'],

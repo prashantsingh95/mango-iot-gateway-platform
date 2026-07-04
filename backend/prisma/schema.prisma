@@ -214,6 +214,7 @@ model Gateway {
   logs              GatewayLog[]
   access            GatewayAccess[]
   uptimeSlots       GatewayUptimeSlot[]
+  metrics           GatewayMetric[]
 
   @@index([tenantId])
   @@index([siteId])
@@ -476,6 +477,26 @@ model GatewayUptimeSlot {
   @@index([tenantId])
   @@index([slotStart])
   @@index([gatewayId, slotStart])
+}
+
+// Gateway Metric History (for historical graphs)
+model GatewayMetric {
+  id           String   @id @default(cuid())
+  gatewayId    String
+  tenantId     String
+  cpuUsage     Float?
+  memoryUsage  Float?
+  diskUsage    Float?
+  temperature  Float?
+  signalStrength Float?
+  voltage      Float?
+  batteryLevel Float?
+  timestamp    DateTime @default(now())
+
+  gateway      Gateway  @relation(fields: [gatewayId], references: [id], onDelete: Cascade)
+
+  @@index([gatewayId, timestamp])
+  @@index([tenantId, timestamp])
 }
 
 // Provisioning Tokens

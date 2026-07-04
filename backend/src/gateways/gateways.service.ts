@@ -384,4 +384,41 @@ export class GatewaysService {
       create: { gatewayId, userId, level: level as any, tenantId },
     });
   }
+
+  async getMetricHistory(id: string, tenantId: string, from?: string, to?: string) {
+    const gateway = await this.prisma.gateway.findFirst({ where: { id, tenantId } });
+    if (!gateway) throw new NotFoundException('Gateway not found');
+
+    const where: any = { gatewayId: id };
+    if (from || to) {
+      where.timestamp = {};
+      if (from) where.timestamp.gte = new Date(from);
+      if (to) where.timestamp.lte = new Date(to);
+    }
+
+    const metrics = await this.prisma.gatewayMetric.findMany({
+      where,
+      orderBy: { timestamp: 'asc' },
+      select: {
+        timestamp: true,
+        cpuUsage: true,
+        memoryUsage: true,
+        diskUsage: true,
+        temperature: true,
+        signalStrength: true,
+      },
+    });
+
+    return {
+      gatewayId: id,
+      metrics: metrics.map((m) => ({
+        t: m.timestamp.toISOString(),
+        cpu: m.cpuUsage,
+        memory: m.memoryUsage,
+        disk: m.diskUsage,
+        temperature: m.temperature,
+        signal: m.signalStrength,
+      })),
+    };
+  }
 }

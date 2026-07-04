@@ -5,6 +5,7 @@ import { gatewaysApi } from '@/lib/api-client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { formatIST } from '@/lib/utils';
 
 interface UptimeSlot {
   t: string;
@@ -76,9 +77,9 @@ export function UptimeTab({ gatewayId }: { gatewayId: string }) {
                     />
                   </TooltipTrigger>
                   <TooltipContent side="top">
-                    <p className="text-xs">
-                      {new Date(slot.t).toLocaleTimeString()} — {slot.v === 1 ? 'Online' : 'Offline'}
-                    </p>
+                      <p className="text-xs">
+                        {formatIST(slot.t)} — {slot.v === 1 ? 'Online' : 'Offline'}
+                      </p>
                   </TooltipContent>
                 </Tooltip>
               ))}
