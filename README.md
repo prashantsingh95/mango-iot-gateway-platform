@@ -258,8 +258,10 @@ sudo bash setup.sh \
   --device-id factory-gw-01
 ```
 
-The client handles MQTT telemetry, Modbus, GPIO and OTA. The **remote terminal**
-is provided by the separate `gateway-agent/` program described above.
+The client handles MQTT telemetry, Modbus, GPIO, OTA — and **also includes the
+reverse-connection terminal agent** (`terminal:` config block), so a single Go
+binary can serve both telemetry and browser terminal sessions. Alternatively, the
+standalone Node agent in `gateway-agent/` can be used for terminal only.
 
 See the client README for features, configuration, and troubleshooting.
 

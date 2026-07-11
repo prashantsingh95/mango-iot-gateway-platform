@@ -48,9 +48,23 @@ export function deriveSigningKey(secretHash: string, pepper: string): Buffer {
   return createHmac('sha256', pepper).update(secretHash).digest();
 }
 
+function stableStringify(value: unknown): string {
+  if (value === undefined) return '';
+  if (value === null) return 'null';
+  if (typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) {
+    return '[' + value.map((v) => stableStringify(v)).join(',') + ']';
+  }
+  const obj = value as Record<string, unknown>;
+  const keys = Object.keys(obj)
+    .filter((k) => obj[k] !== undefined)
+    .sort();
+  return '{' + keys.map((k) => JSON.stringify(k) + ':' + stableStringify(obj[k])).join(',') + '}';
+}
+
 function canonical(message: TerminalMessage): string {
   const { signature: _sig, ...rest } = message;
-  return JSON.stringify(rest);
+  return stableStringify(rest);
 }
 
 export function signMessage(message: TerminalMessage, key: Buffer): string {

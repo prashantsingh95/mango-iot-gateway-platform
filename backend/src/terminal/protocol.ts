@@ -108,9 +108,33 @@ export function deriveSigningKey(secretHash: string, pepper: string): Buffer {
   return createHmac('sha256', pepper).update(secretHash).digest();
 }
 
+/**
+ * Deterministic, language-agnostic canonical form used for HMAC signing.
+ *
+ * Keys are sorted recursively so that the same logical message produces byte-
+ * identical output regardless of field insertion order (and across languages
+ * such as TypeScript and Go, whose default JSON encoders disagree on key
+ * ordering). `undefined` values are omitted (matching `JSON.stringify`).
+ */
+function stableStringify(value: unknown): string {
+  if (value === undefined) return '';
+  if (value === null) return 'null';
+  if (typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) {
+    return '[' + value.map((v) => stableStringify(v)).join(',') + ']';
+  }
+  const obj = value as Record<string, unknown>;
+  const keys = Object.keys(obj)
+    .filter((k) => obj[k] !== undefined)
+    .sort();
+  return (
+    '{' + keys.map((k) => JSON.stringify(k) + ':' + stableStringify(obj[k])).join(',') + '}'
+  );
+}
+
 function canonical(message: TerminalMessage): string {
   const { signature: _signature, ...rest } = message;
-  return JSON.stringify(rest);
+  return stableStringify(rest);
 }
 
 export function signMessage(message: TerminalMessage, key: Buffer): string {
