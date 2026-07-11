@@ -12,7 +12,7 @@ Enterprise IoT gateway management platform. Cloud server for managing fleets of 
 
 Production-ready with **Cloudflare** integration: Pages (frontend), Workers (edge API gateway), R2 (firmware storage), CDN/Cache, WAF and Turnstile. The platform connects to **your own external MQTT broker** — no broker is bundled or deployed.
 
-Sister project: **[mango-iot-gateway-client](https://github.com/mango-iot/gateway-client)** — the Go gateway agent that runs on each Pi and connects to this platform.
+Sister project: **[mango-iot-gateway-client](https://github.com/prashantsingh95/mango-iot-gateway-client)** — the Go gateway agent that runs on each Pi and connects to this platform.
 
 ---
 
