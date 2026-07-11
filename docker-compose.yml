@@ -7,15 +7,15 @@ services:
     image: postgres:16-alpine
     container_name: iot-postgres
     environment:
-      POSTGRES_DB: iot_platform
-      POSTGRES_USER: iotadmin
-      POSTGRES_PASSWORD: iotpassword
+      POSTGRES_DB: ${POSTGRES_DB:-iot_platform}
+      POSTGRES_USER: ${POSTGRES_USER:-iotadmin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-iotpassword}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U iotadmin -d iot_platform"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-iotadmin} -d ${POSTGRES_DB:-iot_platform}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -40,23 +40,8 @@ services:
       - iot-network
     restart: unless-stopped
 
-  emqx:
-    image: emqx:5.5
-    container_name: iot-emqx
-    ports:
-      - "1883:1883"
-      - "8083:8083"
-      - "8084:8084"
-      - "18083:18083"
-    environment:
-      EMQX_NAME: iot-platform
-      EMQX_CLUSTER__DISCOVERY_STRATEGY: static
-      EMQX_DASHBOARD__DEFAULT_PASSWORD: public
-    volumes:
-      - emqx_data:/opt/emqx/data
-    networks:
-      - iot-network
-    restart: unless-stopped
+  # NOTE: No MQTT broker is bundled. This platform connects to an EXTERNAL
+  # MQTT broker configured via MQTT_* environment variables (see .env.example).
 
   nats:
     image: nats:2.10-alpine
@@ -72,36 +57,8 @@ services:
       - iot-network
     restart: unless-stopped
 
-  minio:
-    image: minio/minio:latest
-    container_name: iot-minio
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    volumes:
-      - minio_data:/data
-    command: server /data --console-address ":9001"
-    networks:
-      - iot-network
-    restart: unless-stopped
-
-  minio-setup:
-    image: minio/mc:latest
-    container_name: iot-minio-setup
-    depends_on:
-      - minio
-    entrypoint: >
-      /bin/sh -c "
-      sleep 5;
-      mc alias set local http://minio:9000 minioadmin minioadmin;
-      mc mb local/iot-firmware --ignore-existing;
-      echo 'MinIO bucket created';
-      "
-    networks:
-      - iot-network
+  # NOTE: Object storage is provided by Cloudflare R2 (see R2_* env vars).
+  # No local MinIO/S3 service is deployed.
 
   prometheus:
     image: prom/prometheus:v2.54.0
@@ -175,18 +132,33 @@ services:
     ports:
       - "3001:3001"
     environment:
-      NODE_ENV: production
+      NODE_ENV: ${NODE_ENV:-production}
       PORT: 3001
-      DATABASE_URL: postgresql://iotadmin:iotpassword@postgres:5432/iot_platform?schema=public
+      DATABASE_URL: postgresql://${POSTGRES_USER:-iotadmin}:${DB_PASSWORD:-iotpassword}@postgres:5432/${POSTGRES_DB:-iot_platform}?schema=public
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      JWT_SECRET: super-secret-jwt-key-change-in-production
-      MQTT_BROKER_URL: mqtt://emqx:1883
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_EXPIRES: ${JWT_EXPIRES:-15m}
+      JWT_REFRESH_EXPIRES: ${JWT_REFRESH_EXPIRES:-7d}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
       NATS_URL: nats://nats:4222
-      S3_ENDPOINT: http://minio:9000
-      S3_ACCESS_KEY: minioadmin
-      S3_SECRET_KEY: minioadmin
-      S3_BUCKET: iot-firmware
+      # External MQTT broker (bring your own)
+      MQTT_HOST: ${MQTT_HOST:?MQTT_HOST is required}
+      MQTT_PORT: ${MQTT_PORT:-1883}
+      MQTT_PROTOCOL: ${MQTT_PROTOCOL:-mqtt}
+      MQTT_USERNAME: ${MQTT_USERNAME:-}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:-}
+      MQTT_CLIENT_ID: ${MQTT_CLIENT_ID:-iot-platform-backend}
+      MQTT_TLS_ENABLED: ${MQTT_TLS_ENABLED:-false}
+      # Cloudflare R2 firmware storage
+      R2_BUCKET: ${R2_BUCKET:-}
+      R2_ENDPOINT: ${R2_ENDPOINT:-}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+      R2_PUBLIC_URL: ${R2_PUBLIC_URL:-}
+      OTA_SIGNED_URL_EXPIRY: ${OTA_SIGNED_URL_EXPIRY:-3600}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
     depends_on:
       postgres:
         condition: service_healthy
@@ -204,8 +176,8 @@ services:
     ports:
       - "3000:3000"
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:3001
-      NEXT_PUBLIC_WS_URL: ws://localhost:3001
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
+      NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-ws://localhost:3001}
     depends_on:
       - backend
     networks:
@@ -219,9 +191,7 @@ networks:
 volumes:
   postgres_data:
   redis_data:
-  emqx_data:
   nats_data:
-  minio_data:
   prometheus_data:
   grafana_data:
   loki_data:

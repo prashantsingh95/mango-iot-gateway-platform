@@ -4,7 +4,9 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD, APP_FILTER } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import configuration from './config/configuration';
+import { validateEnv } from './config/env.validation';
 import { PrismaModule } from './common/prisma.module';
+import { StorageModule } from './storage/storage.module';
 import { AuthModule } from './auth/auth.module';
 import { GatewaysModule } from './gateways/gateways.module';
 import { FirmwareModule } from './firmware/firmware.module';
@@ -30,6 +32,7 @@ import { TenantGuard } from './common/guards/tenant.guard';
       isGlobal: true,
       envFilePath: '.env',
       load: [configuration],
+      validate: validateEnv,
     }),
     ThrottlerModule.forRoot([{
       ttl: 60000,
@@ -37,6 +40,7 @@ import { TenantGuard } from './common/guards/tenant.guard';
     }]),
     ScheduleModule.forRoot(),
     PrismaModule,
+    StorageModule,
     CacheModule,
     AuthModule,
     GatewaysModule,

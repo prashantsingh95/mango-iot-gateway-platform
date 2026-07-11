@@ -2,7 +2,8 @@ import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/commo
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../common/prisma.service';
 import { WebSocketGatewayImpl } from '../websocket/websocket.gateway';
-import { connect, MqttClient } from 'mqtt';
+import { connect, MqttClient, IClientOptions } from 'mqtt';
+import * as fs from 'fs';
 
 @Injectable()
 export class MqttService implements OnModuleInit, OnModuleDestroy {
@@ -22,18 +23,10 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit() {
-    const brokerUrl = this.configService.get<string>('mqtt.brokerUrl');
-    const username = this.configService.get<string>('mqtt.username');
-    const password = this.configService.get<string>('mqtt.password');
+    const { brokerUrl, options } = this.buildConnectionConfig();
 
-    this.client = connect(brokerUrl || 'mqtt://localhost:1883', {
-      username,
-      password,
-      clientId: `iot-platform-backend-${Math.random().toString(36).slice(2, 8)}`,
-      clean: true,
-      reconnectPeriod: 5000,
-      connectTimeout: 10000,
-    });
+    this.logger.log(`Connecting to external MQTT broker at ${brokerUrl}`);
+    this.client = connect(brokerUrl, options);
 
     this.client.on('connect', () => {
       this.logger.log(`Connected to MQTT broker at ${brokerUrl}`);
@@ -56,10 +49,6 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       this.logger.warn('MQTT connection closed');
     });
 
-    this.client.on('close', () => {
-      this.logger.warn('MQTT connection closed');
-    });
-
     this.client.on('offline', () => {
       this.logger.warn('MQTT client offline');
     });
@@ -69,6 +58,58 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
     if (this.client) {
       this.client.end(true);
     }
+  }
+
+  /**
+   * Builds the connection URL and options for the EXTERNAL MQTT broker entirely
+   * from environment variables. Supports mqtt, mqtts and WebSocket (ws/wss),
+   * with optional mutual-TLS via CA/cert/key files.
+   */
+  private buildConnectionConfig(): { brokerUrl: string; options: IClientOptions } {
+    const legacyUrl = this.configService.get<string>('mqtt.brokerUrl');
+    const host = this.configService.get<string>('mqtt.host', 'localhost');
+    const port = this.configService.get<number>('mqtt.port', 1883);
+    const protocol = this.configService.get<string>('mqtt.protocol', 'mqtt');
+    const username = this.configService.get<string>('mqtt.username');
+    const password = this.configService.get<string>('mqtt.password');
+    const tlsEnabled = this.configService.get<boolean>('mqtt.tls.enabled', false);
+
+    const brokerUrl = legacyUrl && legacyUrl.length > 0
+      ? legacyUrl
+      : `${protocol}://${host}:${port}`;
+
+    const clientId =
+      this.configService.get<string>('mqtt.clientId') ||
+      `iot-platform-backend-${Math.random().toString(36).slice(2, 8)}`;
+
+    const options: IClientOptions = {
+      username,
+      password,
+      clientId,
+      clean: true,
+      reconnectPeriod: 5000,
+      connectTimeout: 10000,
+    };
+
+    if (tlsEnabled || protocol === 'mqtts' || protocol === 'wss') {
+      const caFile = this.configService.get<string>('mqtt.tls.caFile');
+      const certFile = this.configService.get<string>('mqtt.tls.certFile');
+      const keyFile = this.configService.get<string>('mqtt.tls.keyFile');
+      options.rejectUnauthorized = this.configService.get<boolean>(
+        'mqtt.tls.rejectUnauthorized',
+        true,
+      );
+      try {
+        if (caFile) options.ca = fs.readFileSync(caFile);
+        if (certFile) options.cert = fs.readFileSync(certFile);
+        if (keyFile) options.key = fs.readFileSync(keyFile);
+      } catch (err) {
+        this.logger.error(`Failed to read MQTT TLS certificate files: ${err.message}`);
+        throw err;
+      }
+    }
+
+    return { brokerUrl, options };
   }
 
   private subscribeToTopics() {

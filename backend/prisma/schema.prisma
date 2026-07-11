@@ -192,6 +192,13 @@ model Gateway {
   locationLng       Float?
   tags              String[]
   metadata          Json?
+  config            Json?         // Device-level config overrides (monitoring, MQTT, OTA, etc.)
+  // Reverse-connection agent (remote access) credentials & state
+  agentSecretHash   String?       // SHA-256 hash of the gateway agent secret (never stored in plaintext)
+  agentConnected    Boolean       @default(false)
+  agentConnectedAt  DateTime?
+  agentLastSeen     DateTime?
+  agentVersion      String?
   isProvisioned     Boolean       @default(false)
   provisionedAt     DateTime?
   certificateId     String?
@@ -215,6 +222,7 @@ model Gateway {
   access            GatewayAccess[]
   uptimeSlots       GatewayUptimeSlot[]
   metrics           GatewayMetric[]
+  terminalSessions  TerminalSession[]
 
   @@index([tenantId])
   @@index([siteId])
@@ -222,6 +230,41 @@ model Gateway {
   @@index([groupId])
   @@index([deviceId])
   @@index([serialNumber])
+}
+
+// Remote terminal (reverse-connection) session audit.
+// `id` IS the sessionId used across browser <-> backend <-> agent.
+enum TerminalSessionStatus {
+  ACTIVE
+  CLOSED
+  EXPIRED
+  ERROR
+}
+
+model TerminalSession {
+  id             String                @id @default(cuid())
+  gatewayId      String
+  tenantId       String
+  userId         String
+  status         TerminalSessionStatus @default(ACTIVE)
+  reason         String?
+  clientIp       String?
+  userAgent      String?
+  shell          String?
+  bytesIn        Int                   @default(0)  // bytes sent to the gateway (stdin)
+  bytesOut       Int                   @default(0)  // bytes received from the gateway (stdout/stderr)
+  commandCount   Int                   @default(0)
+  startedAt      DateTime              @default(now())
+  lastActivityAt DateTime              @default(now())
+  endedAt        DateTime?
+
+  gateway        Gateway               @relation(fields: [gatewayId], references: [id], onDelete: Cascade)
+
+  @@index([gatewayId])
+  @@index([tenantId])
+  @@index([userId])
+  @@index([status])
+  @@index([startedAt])
 }
 
 // Gateway Groups

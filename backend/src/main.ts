@@ -7,12 +7,14 @@ import fastifyHelmet from '@fastify/helmet';
 import fastifyCors from '@fastify/cors';
 import fastifyRateLimit from '@fastify/rate-limit';
 import fastifyMultipart from '@fastify/multipart';
+import fastifyCookie from '@fastify/cookie';
 import { AppModule } from './app.module';
 
 const fHelmet = fastifyHelmet as any;
 const fCors = fastifyCors as any;
 const fRateLimit = fastifyRateLimit as any;
 const fMultipart = fastifyMultipart as any;
+const fCookie = fastifyCookie as any;
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -30,6 +32,9 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
 
+  const corsOrigins = configService.get<string[]>('cors.origins', ['http://localhost:3000']);
+  const connectSrc = ["'self'", ...corsOrigins.flatMap((o) => [o, o.replace(/^http/, 'ws')])];
+
   await app.register(fHelmet, {
     contentSecurityPolicy: {
       directives: {
@@ -37,25 +42,42 @@ async function bootstrap() {
         scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
         imgSrc: ["'self'", 'data:', 'blob:'],
-        connectSrc: ["'self'", 'ws://localhost:3001', 'http://localhost:3001'],
+        connectSrc,
         fontSrc: ["'self'"],
         objectSrc: ["'none'"],
         frameAncestors: ["'none'"],
       },
     },
     crossOriginEmbedderPolicy: { policy: 'require-corp' },
+    hsts: {
+      maxAge: 31536000,
+      includeSubDomains: true,
+      preload: true,
+    },
   });
 
   await app.register(fCors, {
-    origin: configService.get<string[]>('CORS_ORIGINS', ['http://localhost:3000']),
+    origin: corsOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'X-Tenant-ID'],
   });
 
+  // Secure cookie support (httpOnly/secure/sameSite handled by consumers).
+  await app.register(fCookie, {
+    secret: configService.get<string>('jwt.secret'),
+    parseOptions: {
+      httpOnly: true,
+      secure: configService.get<boolean>('cookies.secure', false),
+      sameSite: 'lax',
+      path: '/',
+      domain: configService.get<string>('cookies.domain'),
+    },
+  });
+
   await app.register(fRateLimit, {
-    max: 100,
-    timeWindow: 60000,
+    max: parseInt(process.env.RATE_LIMIT_MAX || '100', 10),
+    timeWindow: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000', 10),
     keyGenerator: (req: any) => {
       if (req.url?.includes('/auth/')) {
         return req.ip;

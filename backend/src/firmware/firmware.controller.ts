@@ -1,5 +1,5 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards, Req, BadRequestException, StreamableFile } from '@nestjs/common';
-import { FastifyRequest } from 'fastify';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards, Req, Res, BadRequestException } from '@nestjs/common';
+import { FastifyRequest, FastifyReply } from 'fastify';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { FirmwareService } from './firmware.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -101,9 +101,20 @@ export class FirmwareController {
   }
 
   @Get(':id/download')
-  @ApiOperation({ summary: 'Download firmware binary' })
-  async download(@Param('id') id: string, @CurrentUser('tenantId') tenantId: string) {
-    return this.firmwareService.download(id, tenantId);
+  @ApiOperation({ summary: 'Download firmware binary (redirects to signed R2 URL)' })
+  async download(
+    @Param('id') id: string,
+    @CurrentUser('tenantId') tenantId: string,
+    @Res() reply: FastifyReply,
+  ) {
+    const { url } = await this.firmwareService.getDownloadUrl(id, tenantId);
+    reply.redirect(url, 302);
+  }
+
+  @Get(':id/download-url')
+  @ApiOperation({ summary: 'Get a signed R2 download URL for firmware' })
+  async downloadUrl(@Param('id') id: string, @CurrentUser('tenantId') tenantId: string) {
+    return this.firmwareService.getDownloadUrl(id, tenantId);
   }
 
   @Post(':id/deploy')

@@ -50,24 +50,8 @@ services:
         reservations:
           memory: 64M
 
-  mosquitto:
-    image: eclipse-mosquitto:2-openssl
-    container_name: iot-mosquitto
-    ports:
-      - "1883:1883"
-      - "9001:9001"
-    volumes:
-      - mosquitto_data:/mosquitto/data
-      - ./mosquitto/conf:/mosquitto/config
-    networks:
-      - iot-network
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 64M
-        reservations:
-          memory: 32M
+  # NOTE: No MQTT broker is bundled. The platform connects to an EXTERNAL MQTT
+  # broker configured via MQTT_* environment variables (see .env.example).
 
   backend:
     build:
@@ -82,12 +66,27 @@ services:
       DATABASE_URL: postgresql://iotadmin:${DB_PASSWORD}@postgres:5432/iot_platform?schema=public
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       JWT_SECRET: ${JWT_SECRET}
-      MQTT_BROKER_URL: mqtt://mosquitto:1883
-      MQTT_USERNAME: ${MQTT_USER}
-      MQTT_PASSWORD: ${MQTT_PASSWORD}
-      CORS_ORIGINS: http://localhost:3000,http://${HOST_IP}:3000
+      JWT_EXPIRES: ${JWT_EXPIRES:-15m}
+      JWT_REFRESH_EXPIRES: ${JWT_REFRESH_EXPIRES:-7d}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      # External MQTT broker (bring your own)
+      MQTT_HOST: ${MQTT_HOST}
+      MQTT_PORT: ${MQTT_PORT:-1883}
+      MQTT_PROTOCOL: ${MQTT_PROTOCOL:-mqtt}
+      MQTT_USERNAME: ${MQTT_USERNAME:-${MQTT_USER:-}}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:-}
+      MQTT_CLIENT_ID: ${MQTT_CLIENT_ID:-iot-platform-backend}
+      MQTT_TLS_ENABLED: ${MQTT_TLS_ENABLED:-false}
+      # Cloudflare R2 firmware storage
+      R2_BUCKET: ${R2_BUCKET:-}
+      R2_ENDPOINT: ${R2_ENDPOINT:-}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+      R2_PUBLIC_URL: ${R2_PUBLIC_URL:-}
+      OTA_SIGNED_URL_EXPIRY: ${OTA_SIGNED_URL_EXPIRY:-3600}
+      CORS_ORIGINS: http://localhost:3000,http://${HOST_IP}:3000
     depends_on:
       postgres:
         condition: service_healthy
@@ -132,4 +131,3 @@ networks:
 volumes:
   postgres_data:
   redis_data:
-  mosquitto_data:

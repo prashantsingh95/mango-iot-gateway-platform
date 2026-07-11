@@ -1,0 +1,24 @@
+name = "mango-iot-api-gateway"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Public (non-secret) variables. Secrets (JWT_SECRET) are set via:
+#   wrangler secret put JWT_SECRET
+[vars]
+BACKEND_URL = "https://api.your-domain.com"
+CORS_ORIGINS = "https://app.your-domain.com"
+RATE_LIMIT_MAX = "100"
+RATE_LIMIT_WINDOW = "60"
+
+# Optional KV namespace for distributed edge rate limiting.
+# Create it with: wrangler kv namespace create RATE_LIMIT_KV
+# then paste the id below and uncomment.
+# [[kv_namespaces]]
+# binding = "RATE_LIMIT_KV"
+# id = "<your-kv-namespace-id>"
+
+# Uncomment to bind a custom route/zone.
+# [[routes]]
+# pattern = "api.your-domain.com/*"
+# zone_id = "<your-zone-id>"

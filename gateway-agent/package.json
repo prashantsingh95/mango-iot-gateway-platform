@@ -1,0 +1,21 @@
+{
+  "name": "mango-gateway-agent",
+  "version": "1.0.0",
+  "description": "Mango IoT Gateway Agent — reverse-connection remote terminal & file-transfer client",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts"
+  },
+  "dependencies": {
+    "node-pty": "^1.0.0",
+    "socket.io-client": "^4.7.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.0"
+  }
+}

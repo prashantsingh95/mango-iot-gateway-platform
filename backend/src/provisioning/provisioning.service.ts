@@ -125,7 +125,7 @@ export class ProvisioningService {
   async getDeviceConfig(deviceId: string, tenantId?: string) {
     const gateway = await this.prisma.gateway.findFirst({
       where: { deviceId },
-      select: { id: true, tenantId: true, groupId: true, config: true, mqtt: true },
+      select: { id: true, deviceId: true, name: true, tenantId: true, groupId: true, config: true },
     });
 
     if (!gateway) throw new NotFoundException('Gateway not found');
@@ -142,11 +142,12 @@ export class ProvisioningService {
           select: { config: true },
         })
       : null;
-    const deviceConfig = gateway.config || {};
+    const deviceConfig = (gateway.config as Record<string, any>) || {};
+    const groupOverrides = (groupConfig?.config as Record<string, any>) || {};
 
-    const mergedConfig = {
+    const mergedConfig: Record<string, any> = {
       ...tenantDefaults,
-      ...(groupConfig?.config || {}),
+      ...groupOverrides,
       ...deviceConfig,
     };
 

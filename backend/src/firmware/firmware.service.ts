@@ -1,10 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException, Logger, StreamableFile } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../common/prisma.service';
 import { LoggingService } from '../logging/logging.service';
 import { MqttService } from '../mqtt/mqtt.service';
+import { StorageService } from '../storage/storage.service';
 import { paginate } from '../common/utils/pagination';
-import * as fs from 'fs';
-import * as path from 'path';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -15,7 +15,13 @@ export class FirmwareService {
     private readonly prisma: PrismaService,
     private readonly loggingService: LoggingService,
     private readonly mqttService: MqttService,
+    private readonly storageService: StorageService,
+    private readonly configService: ConfigService,
   ) {}
+
+  private objectKey(id: string, filename: string): string {
+    return `firmware/${id}/${filename}`;
+  }
 
   private readonly allowedSortFields = ['createdAt', 'updatedAt', 'name', 'version', 'status'];
 
@@ -95,22 +101,20 @@ export class FirmwareService {
     });
   }
 
-  async download(id: string, tenantId: string): Promise<StreamableFile> {
+  /**
+   * Returns a short-lived pre-signed R2 URL for downloading the firmware binary.
+   * Firmware is never streamed from local disk.
+   */
+  async getDownloadUrl(id: string, tenantId: string): Promise<{ url: string; expiresIn: number }> {
     const firmware = await this.prisma.firmwareRelease.findFirst({
       where: { id, tenantId },
     });
     if (!firmware) throw new NotFoundException('Firmware release not found');
+    if (!firmware.s3Path) throw new NotFoundException('Firmware binary not uploaded');
 
-    if (!fs.existsSync(firmware.s3Path)) {
-      throw new NotFoundException('Firmware binary file not found on disk');
-    }
-
-    const fileStream = fs.createReadStream(firmware.s3Path);
-    return new StreamableFile(fileStream, {
-      type: 'application/octet-stream',
-      disposition: `attachment; filename="${firmware.filename}"`,
-      length: firmware.fileSize,
-    });
+    const expiresIn = this.configService.get<number>('ota.signedUrlExpiry', 3600);
+    const url = await this.storageService.getSignedDownloadUrl(firmware.s3Path, expiresIn);
+    return { url, expiresIn };
   }
 
   async delete(id: string, tenantId: string) {
@@ -119,8 +123,12 @@ export class FirmwareService {
 
     await this.prisma.firmwareRelease.delete({ where: { id } });
 
-    if (existing.s3Path && fs.existsSync(existing.s3Path)) {
-      fs.unlinkSync(existing.s3Path);
+    if (existing.s3Path) {
+      try {
+        await this.storageService.delete(existing.s3Path);
+      } catch (err) {
+        this.logger.warn(`Failed to delete firmware object from R2: ${err.message}`);
+      }
     }
 
     await this.loggingService.logAudit({
@@ -138,13 +146,10 @@ export class FirmwareService {
     const existing = await this.prisma.firmwareRelease.findFirst({ where: { id, tenantId } });
     if (!existing) throw new NotFoundException('Firmware release not found');
 
-    const uploadDir = './uploads/firmware';
-    if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-
-    const filePath = path.join(uploadDir, `${id}_${file.filename}`);
-    fs.writeFileSync(filePath, file.buffer);
-
     const checksum = crypto.createHash('sha256').update(file.buffer).digest('hex');
+    const key = this.objectKey(id, file.filename);
+
+    await this.storageService.upload(key, file.buffer, file.mimetype);
 
     return this.prisma.firmwareRelease.update({
       where: { id },
@@ -152,7 +157,7 @@ export class FirmwareService {
         filename: file.filename,
         fileSize: file.size,
         checksum,
-        s3Path: filePath,
+        s3Path: key,
       },
     });
   }
@@ -183,6 +188,12 @@ export class FirmwareService {
       select: { id: true, deviceId: true },
     });
 
+    let signedUrl: string | null = null;
+    if (firmware.s3Path && this.storageService.isConfigured()) {
+      const expiresIn = this.configService.get<number>('ota.signedUrlExpiry', 3600);
+      signedUrl = await this.storageService.getSignedDownloadUrl(firmware.s3Path, expiresIn);
+    }
+
     for (const gw of gateways) {
       this.mqttService.publish(`gateway/${gw.deviceId}/command/set`, {
         type: 'update_firmware',
@@ -190,7 +201,7 @@ export class FirmwareService {
           firmwareId: id,
           version: firmware.version,
           filename: firmware.filename,
-          downloadUrl: `/api/firmware/${id}/download`,
+          downloadUrl: signedUrl || `/api/v1/firmware/${id}/download`,
           checksum: firmware.checksum,
         },
         executedAt: new Date().toISOString(),

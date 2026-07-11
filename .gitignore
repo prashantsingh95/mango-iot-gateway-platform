@@ -19,3 +19,10 @@ helm/**/charts/
 mosquitto/conf/
 .env.server
 mosquitto.conf.bak
+
+# Cloudflare
+.dev.vars
+.wrangler/
+.vercel/
+frontend/.vercel/
+cloudflare/worker/.dev.vars
